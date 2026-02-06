@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
+from api.router import router
+from ws.endpoint import router as ws_router
+
 # 환경변수 로드
 load_dotenv()
 
@@ -17,20 +20,21 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",  # Next.js 개발 서버
+        "http://localhost:3001",  # Next.js 개발 서버 (대체 포트)
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# API 라우터 등록
+app.include_router(router)
+
+# WebSocket 라우터 등록
+app.include_router(ws_router)
+
 
 @app.get("/")
 async def root():
     """헬스 체크 엔드포인트"""
     return {"message": "CG Inside 직원 도감 API 서버가 실행 중입니다!"}
-
-
-@app.get("/api/health")
-async def health_check():
-    """API 상태 확인"""
-    return {"status": "healthy"}
