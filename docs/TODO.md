@@ -51,10 +51,14 @@
 | # | 작업 | 담당 | 상태 | 비고 |
 |---|------|------|------|------|
 | 12 | ~~NPC 관리 방식 결정~~ | 지민 | DONE | `is_npc` 플래그 |
-| 13 | 지식베이스 구축 + RAG | 지민 | TODO | 온보딩 문서 기반, LangChain 활용 |
-| 14 | RAG 테스트 페이지 | 지민 | TODO | 어드민 페이지에서 즉시 테스트 |
-| 15 | 정형데이터 질의 (TAG) | 지민 | TODO | DB 직접 조회 |
-| 16 | NPC 채팅 UI | 지민 | TODO | 게임 내 채팅창, NPC 근처 대화 |
+| 13 | 지식베이스 구축 + RAG | 지민 | 진행중 | pgvector 마이그레이션 완료, 아래 세부 작업 진행 필요 |
+| 13a | **Supabase에 pgvector 마이그레이션 SQL 실행** | 지민 | TODO | `backend/data/migration_pgvector.sql` 을 Supabase SQL Editor에서 실행 |
+| 13b | **기존 로컬 지식베이스 문서 DB로 마이그레이션** | 지민 | TODO | `knowledge_base/` 4개 문서 → knowledge_documents 테이블로 이관 |
+| 13c | **RAG 파이프라인 동작 테스트** | 지민 | TODO | 문서 업로드 → 임베딩 생성 → 채팅 질의 응답 E2E 검증 |
+| 13d | **지식베이스 문서 확장** | 지민 | TODO | 조직도, 프로젝트 정보, 업무 프로세스 등 문서 추가 |
+| 14 | ~~RAG 테스트 페이지~~ | 지민 | DONE | `/admin/rag-test` 호비 AI 트레이너 (파일 업로드 + 채팅 + 설정) |
+| 15 | 정형데이터 질의 (TAG) | 지민 | TODO | DB 직접 조회 (코드 구현 완료, 테스트 필요) |
+| 16 | NPC 채팅 UI | 은빈+지민 | TODO | 게임 내 채팅창, NPC 근처 대화 |
 | 16b | NPC 캐릭터 에셋 | 은빈 | TODO | NPC 전용 캐릭터 디자인 + Storage 업로드 |
 | 17 | 입사 서류 다운로드 | 지민 | TODO | NPC 안내 + 파일 다운로드 |
 
@@ -93,6 +97,7 @@
 | 분야 vs 직급 | **둘 다 사용** | `field`(직무) + `position`(직급) 병행 |
 | NPC 관리 | **is_npc 플래그** | profiles 테이블에 `is_npc` boolean |
 | 정형데이터 질의 | **TAG + RAG 하이브리드** | 단순 집계 → DB, 문서 → RAG |
+| 벡터 저장소 | **Supabase pgvector** | FAISS → pgvector 마이그레이션 완료 |
 | 일괄 등록 | **Node.js 스크립트** | `scripts/bulk-register.js`, Secret key |
 | 캐릭터 이미지 | **Supabase Storage** | `characters/{email_prefix}/{direction}.png` |
 | 작업 분리 | **에셋 vs 코드** | 은빈: .png/.json 에셋만, 지민: 코드만 → git 충돌 최소화 |
@@ -126,3 +131,7 @@
 - [x] tests/ 폴더 구조 생성
 - [x] 문서화 (TODO.md, SETUP-GUIDE.md)
 - [x] 기본 캐릭터 이미지 (Sprout Lands 추출, 로컬 폴백)
+- [x] 호비 AI 트레이너 RAG 테스트 페이지 (`/admin/rag-test`)
+- [x] FAISS → pgvector 마이그레이션 (Supabase DB 벡터 검색)
+- [x] 파일 업로드 → 자동 임베딩 생성 기능
+- [x] TAG/RAG 하이브리드 라우팅 구현
