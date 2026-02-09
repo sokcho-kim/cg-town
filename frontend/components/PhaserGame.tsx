@@ -79,10 +79,18 @@ class MainScene extends Phaser.Scene {
     // 타일맵 JSON 로드
     this.load.tilemapTiledJSON('tilemap', '/maps/main.json')
 
-    // 타일셋 이미지 로드
-    this.load.image('grass', '/images/tiles/workspace/grass.png')
-    this.load.image('river', '/images/tiles/workspace/river.png')
-    this.load.image('grass_river_edge', '/images/tiles/workspace/grass_river_edge.png')
+    // Sprout Lands 타일셋 이미지 로드
+    this.load.image('grass', '/images/sprout-lands/tilesets/Grass.png')
+    this.load.image('water', '/images/sprout-lands/tilesets/Water.png')
+    this.load.image('stone_path', '/images/sprout-lands/tilesets/Stone_Path.png')
+    this.load.image('fences', '/images/sprout-lands/tilesets/Fences.png')
+    this.load.image('hills', '/images/sprout-lands/tilesets/Hills.png')
+    this.load.image('trees', '/images/sprout-lands/objects/Trees_stumps_bushes.png')
+    this.load.image('grass_biom', '/images/sprout-lands/objects/Basic_Grass_Biom_things.png')
+    this.load.image('mushrooms_flowers', '/images/sprout-lands/objects/Mushrooms_Flowers_Stones.png')
+
+    // 기본 캐릭터 에셋 로드 (커스텀 이미지가 없는 유저용 폴백)
+    this.loadUserAssets('default')
   }
 
   /**
@@ -96,7 +104,11 @@ class MainScene extends Phaser.Scene {
     const directions = ['front', 'back', 'left', 'right', 'default']
     directions.forEach((dir) => {
       const key = `${username}_${dir}`
-      this.load.image(key, getCharacterImageUrl(username, dir))
+      // 기본 캐릭터는 로컬 파일, 나머지는 Supabase Storage
+      const url = username === 'default'
+        ? `/images/characters/default/${dir}.png`
+        : getCharacterImageUrl(username, dir)
+      this.load.image(key, url)
     })
   }
 
@@ -104,26 +116,37 @@ class MainScene extends Phaser.Scene {
     // 타일맵 생성
     const map = this.make.tilemap({ key: 'tilemap' })
 
-    // 타일셋 이미지 연결
+    // Sprout Lands 타일셋 이미지 연결
     const grassTileset = map.addTilesetImage('grass', 'grass')
-    const riverTileset = map.addTilesetImage('river', 'river')
-    const edgeTileset = map.addTilesetImage('grass_river_edge', 'grass_river_edge')
+    const waterTileset = map.addTilesetImage('water', 'water')
+    const stonePathTileset = map.addTilesetImage('stone_path', 'stone_path')
+    const fencesTileset = map.addTilesetImage('fences', 'fences')
+    const hillsTileset = map.addTilesetImage('hills', 'hills')
+    const treesTileset = map.addTilesetImage('trees', 'trees')
+    const grassBiomTileset = map.addTilesetImage('grass_biom', 'grass_biom')
+    const mushroomsTileset = map.addTilesetImage('mushrooms_flowers', 'mushrooms_flowers')
 
-    // 레이어 생성 (타일셋이 null일 수 있으므로 체크)
-    if (grassTileset) {
-      const groundLayer = map.createLayer('ground', grassTileset, 0, 0)
-      groundLayer?.setDepth(-2)
-    }
+    // 모든 타일셋 배열 (각 레이어에서 필요한 타일셋을 참조)
+    const allTilesets = [
+      grassTileset, waterTileset, stonePathTileset, fencesTileset,
+      hillsTileset, treesTileset, grassBiomTileset, mushroomsTileset
+    ].filter((ts): ts is Phaser.Tilemaps.Tileset => ts !== null)
 
-    if (riverTileset) {
-      const waterLayer = map.createLayer('water', riverTileset, 0, 0)
-      waterLayer?.setDepth(-1)
-    }
+    // 레이어 생성 (바닥부터 위로 쌓기, 모두 배경 깊이)
+    const groundLayer = map.createLayer('ground', allTilesets, 0, 0)
+    groundLayer?.setDepth(-10)
 
-    if (edgeTileset) {
-      const edgeLayer = map.createLayer('edge', edgeTileset, 0, 0)
-      edgeLayer?.setDepth(-1)
-    }
+    const waterLayer = map.createLayer('water', allTilesets, 0, 0)
+    waterLayer?.setDepth(-9)
+
+    const pathsLayer = map.createLayer('paths', allTilesets, 0, 0)
+    pathsLayer?.setDepth(-8)
+
+    const fencesLayer = map.createLayer('fences', allTilesets, 0, 0)
+    fencesLayer?.setDepth(-7)
+
+    const decorationsLayer = map.createLayer('decorations', allTilesets, 0, 0)
+    decorationsLayer?.setDepth(-6)
 
     // 카메라 설정 (맵 경계 설정)
     this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT)
@@ -332,13 +355,18 @@ class MainScene extends Phaser.Scene {
 
   /**
    * username + 방향에 따른 텍스처 키 반환
-   * 텍스처가 아직 로드되지 않았으면 '__DEFAULT' 반환
+   * 유저 텍스처가 없으면 기본 캐릭터(default) 텍스처로 폴백
    */
   private getTextureKey(emailPrefix: string, direction: string): string {
     const storageDir = MainScene.DIRECTION_MAP[direction] || 'default'
     const key = `${emailPrefix}_${storageDir}`
     if (this.textures.exists(key)) {
       return key
+    }
+    // 유저 커스텀 이미지가 없으면 기본 캐릭터 텍스처 사용
+    const fallbackKey = `default_${storageDir}`
+    if (this.textures.exists(fallbackKey)) {
+      return fallbackKey
     }
     return '__DEFAULT'
   }
