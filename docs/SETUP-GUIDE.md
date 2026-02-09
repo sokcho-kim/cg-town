@@ -91,6 +91,26 @@ Supabase Dashboard > **Storage** > `characters` 버킷에서:
 
 ---
 
+## 5단계: pgvector 마이그레이션 (RAG 지식베이스)
+
+NPC 호비의 RAG 시스템을 위해 pgvector를 설정합니다.
+
+Supabase Dashboard > **SQL Editor**에서 아래 파일 내용을 실행합니다:
+
+```
+backend/data/migration_pgvector.sql
+```
+
+생성되는 항목:
+- `knowledge_documents` 테이블 — 지식베이스 문서 원본 저장
+- `knowledge_chunks` 테이블 — 문서 청크 + 임베딩 벡터 (1536차원)
+- `match_knowledge_chunks` RPC 함수 — pgvector 유사도 검색
+- HNSW 인덱스, RLS 정책, updated_at 트리거
+
+> 실행 후 `/admin/rag-test` 페이지에서 문서 업로드 및 RAG 테스트 가능
+
+---
+
 ## 작업 순서 요약
 
 ```
@@ -98,6 +118,7 @@ Supabase Dashboard > **Storage** > `characters` 버킷에서:
 2. users.csv 작성 (30명 정보)
 3. node bulk-register.js (계정 일괄 생성)
 4. 피그마에서 캐릭터 Export → Supabase Storage 업로드
+5. pgvector 마이그레이션 SQL 실행 (RAG 지식베이스)
 ```
 
 ---

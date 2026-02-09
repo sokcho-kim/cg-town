@@ -52,9 +52,9 @@
 |---|------|------|------|------|
 | 12 | ~~NPC 관리 방식 결정~~ | 지민 | DONE | `is_npc` 플래그 |
 | 13 | 지식베이스 구축 + RAG | 지민 | 진행중 | pgvector 마이그레이션 완료, 아래 세부 작업 진행 필요 |
-| 13a | **Supabase에 pgvector 마이그레이션 SQL 실행** | 지민 | TODO | `backend/data/migration_pgvector.sql` 을 Supabase SQL Editor에서 실행 |
-| 13b | **기존 로컬 지식베이스 문서 DB로 마이그레이션** | 지민 | TODO | `knowledge_base/` 4개 문서 → knowledge_documents 테이블로 이관 |
-| 13c | **RAG 파이프라인 동작 테스트** | 지민 | TODO | 문서 업로드 → 임베딩 생성 → 채팅 질의 응답 E2E 검증 |
+| 13a | ~~Supabase에 pgvector 마이그레이션 SQL 실행~~ | 지민 | DONE | `backend/data/migration_pgvector.sql` 실행 완료 |
+| 13b | ~~기존 로컬 지식베이스 문서 DB로 마이그레이션~~ | 지민 | DONE | 4개 문서 → 7개 청크 이관 완료 |
+| 13c | ~~RAG 파이프라인 동작 테스트~~ | 지민 | DONE | RAG/TAG 라우팅 + 질의응답 E2E 검증 완료 |
 | 13d | **지식베이스 문서 확장** | 지민 | TODO | 조직도, 프로젝트 정보, 업무 프로세스 등 문서 추가 |
 | 14 | ~~RAG 테스트 페이지~~ | 지민 | DONE | `/admin/rag-test` 호비 AI 트레이너 (파일 업로드 + 채팅 + 설정) |
 | 15 | 정형데이터 질의 (TAG) | 지민 | TODO | DB 직접 조회 (코드 구현 완료, 테스트 필요) |

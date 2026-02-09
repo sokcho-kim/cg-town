@@ -1,7 +1,7 @@
 """pgvector 벡터 스토어 관리 (Supabase)"""
 import json
 import logging
-from lib.supabase import get_supabase_client
+from lib.supabase import get_supabase_admin
 from rag.embeddings import get_embeddings
 from rag.document_loader import chunk_text
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def embed_and_store_document(document_id: str, filename: str, content: str) -> int:
     """문서를 청크로 분할하고, 임베딩 생성 후 DB에 저장. 청크 수 반환."""
-    supabase = get_supabase_client()
+    supabase = get_supabase_admin()
     embeddings = get_embeddings()
 
     # 기존 청크 삭제
@@ -47,7 +47,7 @@ def embed_and_store_document(document_id: str, filename: str, content: str) -> i
 
 def rebuild_all_embeddings() -> int:
     """모든 문서의 임베딩을 재빌드. 총 청크 수 반환."""
-    supabase = get_supabase_client()
+    supabase = get_supabase_admin()
 
     docs = supabase.table("knowledge_documents").select("id, filename, content").execute()
     if not docs.data:
@@ -65,7 +65,7 @@ def rebuild_all_embeddings() -> int:
 
 def search_similar(query: str, k: int = 3, threshold: float = 0.3) -> list[dict]:
     """쿼리와 유사한 청크 검색 (pgvector)"""
-    supabase = get_supabase_client()
+    supabase = get_supabase_admin()
     embeddings = get_embeddings()
 
     query_vector = embeddings.embed_query(query)
@@ -81,6 +81,6 @@ def search_similar(query: str, k: int = 3, threshold: float = 0.3) -> list[dict]
 
 def get_total_chunks() -> int:
     """전체 청크 수 반환"""
-    supabase = get_supabase_client()
+    supabase = get_supabase_admin()
     result = supabase.table("knowledge_chunks").select("id", count="exact").execute()
     return result.count or 0

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from api.deps import get_current_user
-from lib.supabase import get_supabase_client
+from lib.supabase import get_supabase_admin
 from rag.router import classify_and_route
 from rag.vector_store import embed_and_store_document, rebuild_all_embeddings, get_total_chunks
 from rag.config import get_settings, save_settings
@@ -91,7 +91,7 @@ async def update_npc_settings(body: SettingsRequest, current_user=Depends(get_cu
 @router.get("/documents")
 async def list_documents(current_user=Depends(get_current_user)):
     """지식베이스 문서 목록 조회"""
-    supabase = get_supabase_client()
+    supabase = get_supabase_admin()
 
     docs = supabase.table("knowledge_documents").select("id, filename").execute()
 
@@ -115,7 +115,7 @@ async def list_documents(current_user=Depends(get_current_user)):
 @router.get("/documents/{filename}")
 async def get_document(filename: str, current_user=Depends(get_current_user)):
     """문서 내용 조회"""
-    supabase = get_supabase_client()
+    supabase = get_supabase_admin()
 
     result = (
         supabase.table("knowledge_documents")
@@ -134,7 +134,7 @@ async def get_document(filename: str, current_user=Depends(get_current_user)):
 @router.post("/documents")
 async def create_document(body: DocumentRequest, current_user=Depends(get_current_user)):
     """새 문서 추가 (텍스트 입력)"""
-    supabase = get_supabase_client()
+    supabase = get_supabase_admin()
     filename = body.title if body.title.endswith((".md", ".txt")) else f"{body.title}.md"
 
     # 중복 체크
@@ -168,7 +168,7 @@ async def create_document(body: DocumentRequest, current_user=Depends(get_curren
 @router.put("/documents/{filename}")
 async def update_document(filename: str, body: DocumentRequest, current_user=Depends(get_current_user)):
     """문서 수정"""
-    supabase = get_supabase_client()
+    supabase = get_supabase_admin()
 
     existing = (
         supabase.table("knowledge_documents")
@@ -198,7 +198,7 @@ async def update_document(filename: str, body: DocumentRequest, current_user=Dep
 @router.delete("/documents/{filename}")
 async def delete_document(filename: str, current_user=Depends(get_current_user)):
     """문서 삭제 (연결된 청크도 cascade 삭제)"""
-    supabase = get_supabase_client()
+    supabase = get_supabase_admin()
 
     existing = (
         supabase.table("knowledge_documents")
@@ -243,7 +243,7 @@ async def upload_document(file: UploadFile = File(...), current_user=Depends(get
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="파일 인코딩을 읽을 수 없습니다. UTF-8 또는 EUC-KR만 지원합니다.")
 
-    supabase = get_supabase_client()
+    supabase = get_supabase_admin()
 
     # 기존 문서 있으면 업데이트, 없으면 생성
     existing = (
