@@ -4,11 +4,12 @@ from dotenv import load_dotenv
 import os
 import logging
 
-from api.router import router
-from ws.endpoint import router as ws_router
-
-# 환경변수 로드
+# 환경변수 로드 (import보다 먼저 실행해야 OPENAI_API_KEY 등이 적용됨)
 load_dotenv()
+
+from api.router import router
+from api.npc_router import router as npc_router
+from ws.endpoint import router as ws_router
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +34,9 @@ app.add_middleware(
 
 # API 라우터 등록
 app.include_router(router)
+
+# NPC 채팅 라우터 등록
+app.include_router(npc_router)
 
 # WebSocket 라우터 등록
 app.include_router(ws_router)
