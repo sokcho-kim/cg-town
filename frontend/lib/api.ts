@@ -28,6 +28,56 @@ export async function apiClient(endpoint: string, options: RequestInit = {}) {
   return response.json()
 }
 
+// SSE 스트리밍 헬퍼
+export async function apiStream(
+  endpoint: string,
+  data: unknown,
+  onEvent: (event: Record<string, unknown>) => void,
+) {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'API 요청 실패' }))
+    throw new Error(error.detail || `HTTP ${response.status}`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('스트리밍을 지원하지 않습니다.')
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          const event = JSON.parse(line.slice(6))
+          onEvent(event)
+        } catch { /* skip malformed */ }
+      }
+    }
+  }
+}
+
 // Convenience methods
 export const api = {
   get: (endpoint: string) => apiClient(endpoint),

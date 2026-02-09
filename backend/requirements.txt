@@ -10,3 +10,7 @@ langchain>=0.3.0
 langchain-openai>=0.3.0
 langchain-community>=0.3.0
 tiktoken>=0.8.0
+
+# 문서 파서
+pypdf>=5.0.0
+python-docx>=1.1.0

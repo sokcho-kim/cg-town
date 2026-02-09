@@ -63,20 +63,33 @@ def rebuild_all_embeddings() -> int:
     return total
 
 
-def search_similar(query: str, k: int = 3, threshold: float = 0.3) -> list[dict]:
-    """쿼리와 유사한 청크 검색 (pgvector)"""
+def search_similar(query: str, k: int = 3) -> list[dict]:
+    """하이브리드 검색: 벡터(pgvector) + 키워드(tsvector) → RRF 병합"""
     supabase = get_supabase_admin()
     embeddings = get_embeddings()
 
     query_vector = embeddings.embed_query(query)
 
-    result = supabase.rpc("match_knowledge_chunks", {
-        "query_embedding": query_vector,
-        "match_threshold": threshold,
-        "match_count": k,
-    }).execute()
+    # 하이브리드 검색 시도, 실패 시 벡터 전용 폴백
+    try:
+        result = supabase.rpc("match_knowledge_hybrid", {
+            "query_embedding": query_vector,
+            "query_text": query,
+            "match_count": k,
+        }).execute()
+    except Exception as e:
+        logger.warning(f"하이브리드 검색 실패, 벡터 검색으로 폴백: {e}")
+        result = supabase.rpc("match_knowledge_chunks", {
+            "query_embedding": query_vector,
+            "match_threshold": 0.3,
+            "match_count": k,
+        }).execute()
 
-    return result.data or []
+    docs = result.data or []
+    for doc in docs:
+        st = doc.get("search_type", "vector")
+        logger.info(f"  [{st}] score={doc.get('similarity', 0):.4f} - {doc['content'][:50]}...")
+    return docs
 
 
 def get_total_chunks() -> int:

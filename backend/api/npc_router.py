@@ -1,17 +1,19 @@
-"""NPC 채팅 API 엔드포인트 (pgvector 기반)"""
+"""NPC 채팅 API 엔드포인트 (pgvector + 하이브리드 검색 + SSE 스트리밍)"""
+import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from api.deps import get_current_user
 from lib.supabase import get_supabase_admin
-from rag.router import classify_and_route
+from rag.router import classify_and_route, classify_and_route_stream
 from rag.vector_store import embed_and_store_document, rebuild_all_embeddings, get_total_chunks
 from rag.config import get_settings, save_settings
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_EXTENSIONS = {".md", ".txt"}
+ALLOWED_EXTENSIONS = {".md", ".txt", ".pdf", ".docx", ".doc"}
 
 router = APIRouter(prefix="/api/npc")
 
@@ -63,6 +65,23 @@ async def npc_chat(body: ChatRequest, current_user=Depends(get_current_user)):
         route=result.get("route", "rag"),
         intent=result.get("intent", "unknown"),
         sources=result.get("sources"),
+    )
+
+
+@router.post("/chat/stream")
+async def npc_chat_stream(body: ChatRequest, current_user=Depends(get_current_user)):
+    """NPC에게 질문하기 (SSE 스트리밍)"""
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="메시지를 입력해 주세요.")
+
+    async def event_generator():
+        async for event in classify_and_route_stream(body.message):
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
@@ -221,8 +240,9 @@ async def delete_document(filename: str, current_user=Depends(get_current_user))
 
 @router.post("/documents/upload")
 async def upload_document(file: UploadFile = File(...), current_user=Depends(get_current_user)):
-    """파일 업로드로 문서 추가 (.md, .txt)"""
+    """파일 업로드로 문서 추가 (.md, .txt, .pdf, .docx)"""
     import os
+    from rag.document_loader import extract_text
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="파일 이름이 없습니다.")
@@ -235,13 +255,15 @@ async def upload_document(file: UploadFile = File(...), current_user=Depends(get
         )
 
     content = await file.read()
+
+    # 50MB 제한
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="파일 크기가 50MB를 초과합니다.")
+
     try:
-        text = content.decode("utf-8")
-    except UnicodeDecodeError:
-        try:
-            text = content.decode("euc-kr")
-        except UnicodeDecodeError:
-            raise HTTPException(status_code=400, detail="파일 인코딩을 읽을 수 없습니다. UTF-8 또는 EUC-KR만 지원합니다.")
+        text = extract_text(content, file.filename)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"파일 처리 실패: {e}")
 
     supabase = get_supabase_admin()
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { api } from '@/lib/api'
+import { api, apiStream } from '@/lib/api'
 import Link from 'next/link'
 
 // ===== Types =====
@@ -112,23 +112,66 @@ export default function HobiTrainerPage() {
     setInput('')
     setMessages((prev) => [...prev, { role: 'user', content: question }])
     setLoading(true)
+
+    // 스트리밍 메시지를 누적할 변수
+    let streamContent = ''
+    let route = ''
+    let intent = ''
+    let sources: { source: string; content: string }[] | undefined
+
     try {
-      const data = await api.post('/api/npc/chat', { message: question })
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'npc',
-          content: data.answer,
-          route: data.route,
-          intent: data.intent,
-          sources: data.sources,
-        },
-      ])
+      // NPC 응답 placeholder 추가
+      setMessages((prev) => [...prev, { role: 'npc', content: '' }])
+
+      await apiStream('/api/npc/chat/stream', { message: question }, (event) => {
+        const type = event.type as string
+
+        if (type === 'tag_result') {
+          // TAG: 즉시 완료
+          const data = event.data as Record<string, unknown>
+          streamContent = data.answer as string
+          route = data.route as string
+          intent = data.intent as string
+          sources = data.sources as typeof sources
+          setMessages((prev) => {
+            const updated = [...prev]
+            updated[updated.length - 1] = {
+              role: 'npc', content: streamContent, route, intent, sources,
+            }
+            return updated
+          })
+        } else if (type === 'route_info') {
+          route = event.route as string
+          intent = event.intent as string
+        } else if (type === 'sources') {
+          sources = event.sources as typeof sources
+        } else if (type === 'token') {
+          streamContent += event.content as string
+          setMessages((prev) => {
+            const updated = [...prev]
+            updated[updated.length - 1] = {
+              role: 'npc', content: streamContent, route, intent, sources,
+            }
+            return updated
+          })
+        } else if (type === 'done') {
+          setMessages((prev) => {
+            const updated = [...prev]
+            updated[updated.length - 1] = {
+              role: 'npc', content: streamContent, route, intent, sources,
+            }
+            return updated
+          })
+        }
+      })
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'npc', content: `오류가 발생했습니다: ${err}` },
-      ])
+      setMessages((prev) => {
+        const updated = [...prev]
+        updated[updated.length - 1] = {
+          role: 'npc', content: `오류가 발생했습니다: ${err}`,
+        }
+        return updated
+      })
     } finally {
       setLoading(false)
     }
@@ -180,9 +223,10 @@ export default function HobiTrainerPage() {
 
   async function handleUploadFiles(files: FileList | File[]) {
     const fileArray = Array.from(files)
-    const allowed = fileArray.filter((f) => f.name.endsWith('.md') || f.name.endsWith('.txt'))
+    const exts = ['.md', '.txt', '.pdf', '.docx', '.doc']
+    const allowed = fileArray.filter((f) => exts.some((ext) => f.name.toLowerCase().endsWith(ext)))
     if (allowed.length === 0) {
-      alert('.md 또는 .txt 파일만 업로드할 수 있습니다.')
+      alert('.md, .txt, .pdf, .docx 파일만 업로드할 수 있습니다.')
       return
     }
     setUploading(true)
@@ -472,7 +516,7 @@ function KnowledgeBasePanel({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".md,.txt"
+          accept=".md,.txt,.pdf,.docx,.doc"
           multiple
           className="hidden"
           onChange={(e) => {
@@ -487,7 +531,7 @@ function KnowledgeBasePanel({
         ) : (
           <>
             <p className="text-sm text-gray-500">파일을 드래그하거나 클릭하여 업로드</p>
-            <p className="text-xs text-gray-400 mt-1">.md, .txt 지원</p>
+            <p className="text-xs text-gray-400 mt-1">.md, .txt, .pdf, .docx 지원 (최대 50MB)</p>
           </>
         )}
       </div>

@@ -111,6 +111,26 @@ backend/data/migration_pgvector.sql
 
 ---
 
+## 6단계: 하이브리드 검색 마이그레이션 (tsvector)
+
+5단계 완료 후, 하이브리드 검색(벡터 + 키워드)을 활성화합니다.
+
+Supabase Dashboard > **SQL Editor**에서 아래 파일 내용을 실행합니다:
+
+```
+backend/data/migration_hybrid_search.sql
+```
+
+생성되는 항목:
+- `content_fts` tsvector 컬럼 — 키워드 검색용 전문 색인
+- GIN 인덱스 — tsvector 빠른 검색
+- 자동 tsvector 갱신 트리거
+- `match_knowledge_hybrid` RPC 함수 — RRF 알고리즘으로 벡터+키워드 결과 병합
+
+> 기존 청크에도 자동으로 tsvector가 생성됩니다 (트리거 + UPDATE SET)
+
+---
+
 ## 작업 순서 요약
 
 ```
@@ -119,6 +139,7 @@ backend/data/migration_pgvector.sql
 3. node bulk-register.js (계정 일괄 생성)
 4. 피그마에서 캐릭터 Export → Supabase Storage 업로드
 5. pgvector 마이그레이션 SQL 실행 (RAG 지식베이스)
+6. 하이브리드 검색 마이그레이션 SQL 실행 (tsvector)
 ```
 
 ---

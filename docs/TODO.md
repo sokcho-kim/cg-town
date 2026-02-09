@@ -51,11 +51,14 @@
 | # | 작업 | 담당 | 상태 | 비고 |
 |---|------|------|------|------|
 | 12 | ~~NPC 관리 방식 결정~~ | 지민 | DONE | `is_npc` 플래그 |
-| 13 | 지식베이스 구축 + RAG | 지민 | 진행중 | pgvector 마이그레이션 완료, 아래 세부 작업 진행 필요 |
+| 13 | 지식베이스 구축 + RAG | 지민 | 진행중 | pgvector + 하이브리드 검색 + SSE 스트리밍 완료, 문서 확장 남음 |
 | 13a | ~~Supabase에 pgvector 마이그레이션 SQL 실행~~ | 지민 | DONE | `backend/data/migration_pgvector.sql` 실행 완료 |
 | 13b | ~~기존 로컬 지식베이스 문서 DB로 마이그레이션~~ | 지민 | DONE | 4개 문서 → 7개 청크 이관 완료 |
 | 13c | ~~RAG 파이프라인 동작 테스트~~ | 지민 | DONE | RAG/TAG 라우팅 + 질의응답 E2E 검증 완료 |
 | 13d | **지식베이스 문서 확장** | 지민 | TODO | 조직도, 프로젝트 정보, 업무 프로세스 등 문서 추가 |
+| 13e | ~~하이브리드 검색 (pgvector + tsvector)~~ | 지민 | DONE | RRF 알고리즘, `migration_hybrid_search.sql` 실행 완료 |
+| 13f | ~~SSE 스트리밍 응답~~ | 지민 | DONE | `/chat/stream` 엔드포인트, 실시간 토큰 출력 |
+| 13g | ~~PDF/DOCX 파일 업로드 지원~~ | 지민 | DONE | pypdf + python-docx, 50MB 제한 |
 | 14 | ~~RAG 테스트 페이지~~ | 지민 | DONE | `/admin/rag-test` 호비 AI 트레이너 (파일 업로드 + 채팅 + 설정) |
 | 15 | 정형데이터 질의 (TAG) | 지민 | TODO | DB 직접 조회 (코드 구현 완료, 테스트 필요) |
 | 16 | NPC 채팅 UI | 은빈+지민 | TODO | 게임 내 채팅창, NPC 근처 대화 |
@@ -98,6 +101,8 @@
 | NPC 관리 | **is_npc 플래그** | profiles 테이블에 `is_npc` boolean |
 | 정형데이터 질의 | **TAG + RAG 하이브리드** | 단순 집계 → DB, 문서 → RAG |
 | 벡터 저장소 | **Supabase pgvector** | FAISS → pgvector 마이그레이션 완료 |
+| 검색 방식 | **하이브리드 (벡터+키워드)** | pgvector + tsvector → RRF 병합 (0.7:0.3) |
+| 응답 방식 | **SSE 스트리밍** | 토큰 단위 실시간 출력 |
 | 일괄 등록 | **Node.js 스크립트** | `scripts/bulk-register.js`, Secret key |
 | 캐릭터 이미지 | **Supabase Storage** | `characters/{email_prefix}/{direction}.png` |
 | 작업 분리 | **에셋 vs 코드** | 은빈: .png/.json 에셋만, 지민: 코드만 → git 충돌 최소화 |
@@ -135,3 +140,6 @@
 - [x] FAISS → pgvector 마이그레이션 (Supabase DB 벡터 검색)
 - [x] 파일 업로드 → 자동 임베딩 생성 기능
 - [x] TAG/RAG 하이브리드 라우팅 구현
+- [x] 하이브리드 검색 (pgvector + tsvector, RRF 알고리즘)
+- [x] SSE 스트리밍 응답 (토큰 단위 실시간 출력)
+- [x] PDF/DOCX 파일 업로드 지원 (pypdf + python-docx)

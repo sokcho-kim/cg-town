@@ -5,7 +5,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from rag.config import OPENAI_API_KEY, get_settings
 from rag.tag_queries import TAG_QUERY_MAP
-from rag.chain import query_rag
+from rag.chain import query_rag, query_rag_stream
 
 logger = logging.getLogger(__name__)
 
@@ -65,3 +65,44 @@ async def classify_and_route(question: str) -> dict:
     result["route"] = "rag"
     result["intent"] = intent
     return result
+
+
+async def classify_intent(question: str) -> tuple[str, dict]:
+    """의도만 분류하여 반환 (스트리밍용)"""
+    settings = get_settings()
+    llm = ChatOpenAI(
+        model=settings["chat_model"],
+        temperature=0,
+        openai_api_key=OPENAI_API_KEY,
+    )
+
+    try:
+        messages = CLASSIFIER_PROMPT.format_messages(question=question)
+        response = llm.invoke(messages)
+        classification = json.loads(response.content)
+        return classification.get("intent", "rag"), classification.get("params", {})
+    except Exception as e:
+        logger.warning(f"의도 분류 실패, RAG로 폴백: {e}")
+        return "rag", {}
+
+
+async def classify_and_route_stream(question: str):
+    """스트리밍 라우팅: TAG는 즉시 반환, RAG는 스트리밍"""
+    intent, params = await classify_intent(question)
+
+    # TAG 경로 (스트리밍 불필요, 즉시 반환)
+    if intent in TAG_QUERY_MAP:
+        tag_func = TAG_QUERY_MAP[intent]
+        if intent == "employees_by_department" and params.get("department"):
+            result = await tag_func(params["department"])
+        else:
+            result = await tag_func()
+        result["route"] = "tag"
+        result["intent"] = intent
+        yield {"type": "tag_result", "data": result}
+        return
+
+    # RAG 경로 (스트리밍)
+    yield {"type": "route_info", "route": "rag", "intent": intent}
+    async for event in query_rag_stream(question):
+        yield event
