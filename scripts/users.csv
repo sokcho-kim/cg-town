@@ -1,5 +1,29 @@
-username,email,department,position,is_npc
-조은빈,bin@ihopper.co.kr,디자인팀,사원,false
-김지민,jimin@ihopper.co.kr,개발팀,사원,false
-박선춘,psc@ihopper.co.kr,경영지원,대표,false
-CG봇,npc_cg@ihopper.co.kr,CG Town,NPC,true
+username,email,department,position,is_npc,status_message
+박선춘,psc@ihopper.co.kr,경영,CEO,false,🦝 너구리
+정태일,tale.jung@ihopper.co.kr,경영,CTO,false,🦡 벌꿀오소리
+박상은,ae@ihopper.co.kr,경영,이사,false,🪿 두루미
+강혜진,hj@ihopper.co.kr,경영,대리,false,🐻 쿼카
+조은빈,bin@ihopper.co.kr,기획,사원,false,🐰 토끼
+한기옥,ddc0000@ihopper.co.kr,기획,사원,false,🦈 아기상어
+조민혁,cmh5057@ihopper.co.kr,연구소,소장,false,🫎 무스
+김정훈,wjdgns429@ihopper.co.kr,연구소,부소장,false,🐱 삵
+김정현,jhkim@ihopper.co.kr,연구소,연구원,false,🐿️ 북방하늘다람쥐
+김기석,kks9807@ihopper.co.kr,연구소,연구원,false,🐿️ 한국다람쥐
+전병훈,bhjeon@ihopper.co.kr,AI,팀장,false,🦦 수달
+이성욱,wookie0810@ihopper.co.kr,AI,대리,false,🦫 카피바라
+성민창,sminchang@ihopper.co.kr,AI,대리,false,🐾 족제비
+김지민,jimin@ihopper.co.kr,AI,대리,false,🐶 개(포메)
+강용제,yjkang@ihopper.co.kr,AI,사원,false,🦍 고릴라
+김서영,seoyoung@ihopper.co.kr,AI,사원,false,🐱 고양이
+서동완,dwseo@ihopper.co.kr,서비스개발,팀장,false,🦌 노새사슴
+황현진,hghwang@ihopper.co.kr,서비스개발,,false,🐷 이베리코 흑돼지
+주효원,hwjoo1@ihopper.co.kr,서비스개발,,false,🦊 사막여우
+김지혜,wisekim@ihopper.co.kr,서비스개발,,false,🐶 말티즈
+한석영,hanseok@ihopper.co.kr,서비스개발,,false,🐾 족제비
+황소은,soeun00@ihopper.co.kr,서비스개발,,false,🐐 산양
+정호현,ghgus990129@ihopper.co.kr,서비스개발,,false,🐭 생쥐
+김연화,yunha212@ihopper.co.kr,서비스개발,,false,🐻 쿼카
+도현승,dohs@ihopper.co.kr,서비스개발,,false,🐦 도요새
+이태림,xofla1012@ihopper.co.kr,서비스개발,,false,🦁 사자
+정재동,gendhi52@ihopper.co.kr,서비스개발,,false,🐯 호랑이
+CG봇,npc_cg@ihopper.co.kr,CG Town,NPC,true,🤖 호비

@@ -70,6 +70,7 @@ class MainScene extends Phaser.Scene {
   private myEmailPrefix: string = ''
   private myStatusMessage: string = ''
   private loadedUsers: Set<string> = new Set()
+  private isShutDown: boolean = false
 
   constructor() {
     super({ key: 'MainScene' })
@@ -88,6 +89,14 @@ class MainScene extends Phaser.Scene {
     this.load.image('trees', '/images/sprout-lands/objects/Trees_stumps_bushes.png')
     this.load.image('grass_biom', '/images/sprout-lands/objects/Basic_Grass_Biom_things.png')
     this.load.image('mushrooms_flowers', '/images/sprout-lands/objects/Mushrooms_Flowers_Stones.png')
+
+    // __DEFAULT 플레이스홀더 (1x1 투명 픽셀) — 에셋 로드 전 빈 텍스처 방지
+    if (!this.textures.exists('__DEFAULT')) {
+      const canvas = document.createElement('canvas')
+      canvas.width = 1
+      canvas.height = 1
+      this.textures.addCanvas('__DEFAULT', canvas)
+    }
 
     // 기본 캐릭터 에셋 로드 (커스텀 이미지가 없는 유저용 폴백)
     this.loadUserAssets('default')
@@ -151,11 +160,12 @@ class MainScene extends Phaser.Scene {
     // 카메라 설정 (맵 경계 설정)
     this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT)
 
-    // 플레이어 스프라이트 생성 (텍스처는 MY_INFO_UPDATE에서 설정)
+    // 플레이어 스프라이트 생성 (기본 캐릭터로 시작, MY_INFO_UPDATE에서 커스텀으로 교체)
+    const initialTexture = this.textures.exists('default_front') ? 'default_front' : '__DEFAULT'
     this.player = this.add.sprite(
       this.gridX * TILE_SIZE + TILE_SIZE / 2,
       this.gridY * TILE_SIZE + TILE_SIZE / 2,
-      '__DEFAULT'
+      initialTexture
     )
     this.player.setDisplaySize(TILE_SIZE, TILE_SIZE * 1.5)
     this.player.setOrigin(0.5, 0.75)
@@ -204,6 +214,10 @@ class MainScene extends Phaser.Scene {
     // EventBus 이벤트 리스너 등록
     this.setupEventListeners()
 
+    // 씬 파괴 시 정리 (React Strict Mode에서 game.destroy() 호출 시 실행)
+    this.events.on('shutdown', this.shutdown, this)
+    this.events.on('destroy', this.shutdown, this)
+
     // 씬 준비 완료 이벤트 발생
     EventBus.emit(GameEvents.SCENE_READY, this)
   }
@@ -223,17 +237,28 @@ class MainScene extends Phaser.Scene {
    * 내 정보 업데이트 핸들러
    */
   private handleMyInfoUpdate = (data: { name: string; emailPrefix: string; statusMessage: string; gridPos: { x: number; y: number } | null }) => {
+    // 씬이 파괴된 상태면 무시 (React Strict Mode 대응)
+    if (this.isShutDown) return
+
     this.myName = data.name
     if (data.emailPrefix && data.emailPrefix !== this.myEmailPrefix) {
       this.myEmailPrefix = data.emailPrefix
       // 내 캐릭터 에셋 동적 로드
       this.loadUserAssets(data.emailPrefix)
       this.load.once('complete', () => {
-        if (this.player) {
-          this.player.setTexture(this.getTextureKey(this.myEmailPrefix, this.direction))
-        }
+        if (this.isShutDown || !this.player) return
+        const key = this.getTextureKey(this.myEmailPrefix, this.direction)
+        this.player.setTexture(key)
+        this.player.setVisible(true)
       })
       this.load.start()
+    } else if (data.emailPrefix && this.player) {
+      // 이미 로드된 에셋이면 바로 적용
+      const key = this.getTextureKey(this.myEmailPrefix, this.direction)
+      if (this.textures.exists(key)) {
+        this.player.setTexture(key)
+        this.player.setVisible(true)
+      }
     }
     if (this.playerNameText) {
       this.playerNameText.setText(data.name)
@@ -257,6 +282,9 @@ class MainScene extends Phaser.Scene {
    * 원격 플레이어 업데이트 핸들러
    */
   private handleRemotePlayersUpdate = (players: Record<string, RemotePlayer>) => {
+    // 씬이 파괴된 상태면 무시 (React Strict Mode 대응)
+    if (this.isShutDown) return
+
     const currentPlayerIds = new Set(Object.keys(players))
 
     // 제거된 플레이어 삭제
@@ -460,6 +488,9 @@ class MainScene extends Phaser.Scene {
    * 씬 정리
    */
   shutdown() {
+    if (this.isShutDown) return
+    this.isShutDown = true
+
     // EventBus 이벤트 리스너 해제
     EventBus.off(GameEvents.REMOTE_PLAYERS_UPDATE, this.handleRemotePlayersUpdate, this)
     EventBus.off(GameEvents.MY_INFO_UPDATE, this.handleMyInfoUpdate, this)
@@ -482,6 +513,11 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
   const containerRef = useRef<HTMLDivElement>(null)
   // 현재 씬 ref
   const sceneRef = useRef<Phaser.Scene | null>(null)
+  // 씬 준비 완료 여부
+  const sceneReadyRef = useRef<boolean>(false)
+  // 최신 props를 씬 ready 시점에 전달하기 위한 refs
+  const latestPropsRef = useRef({ myName, myEmailPrefix, myStatusMessage, myGridPos, remotePlayers })
+  latestPropsRef.current = { myName, myEmailPrefix, myStatusMessage, myGridPos, remotePlayers }
 
   // 외부에서 게임 인스턴스에 접근할 수 있도록 설정
   useImperativeHandle(ref, () => ({
@@ -523,7 +559,12 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
     // 씬 준비 완료 이벤트 리스너
     const handleSceneReady = (scene: Phaser.Scene) => {
       sceneRef.current = scene
+      sceneReadyRef.current = true
       EventBus.emit(GameEvents.GAME_READY, game)
+      // 씬이 준비되면 현재 데이터를 즉시 전달 (WS 데이터가 먼저 도착했을 수 있음)
+      const p = latestPropsRef.current
+      EventBus.emit(GameEvents.MY_INFO_UPDATE, { name: p.myName, emailPrefix: p.myEmailPrefix, statusMessage: p.myStatusMessage, gridPos: p.myGridPos })
+      EventBus.emit(GameEvents.REMOTE_PLAYERS_UPDATE, p.remotePlayers)
     }
     EventBus.on(GameEvents.SCENE_READY, handleSceneReady)
 
@@ -537,6 +578,7 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
     return () => {
       EventBus.off(GameEvents.SCENE_READY, handleSceneReady)
       EventBus.off(GameEvents.PLAYER_MOVE, handlePlayerMove)
+      sceneReadyRef.current = false
 
       // 게임 인스턴스 파괴
       if (gameRef.current) {
@@ -549,12 +591,16 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
 
   // 원격 플레이어 업데이트를 Phaser로 전달
   useEffect(() => {
-    EventBus.emit(GameEvents.REMOTE_PLAYERS_UPDATE, remotePlayers)
+    if (sceneReadyRef.current) {
+      EventBus.emit(GameEvents.REMOTE_PLAYERS_UPDATE, remotePlayers)
+    }
   }, [remotePlayers])
 
   // 내 정보 업데이트를 Phaser로 전달
   useEffect(() => {
-    EventBus.emit(GameEvents.MY_INFO_UPDATE, { name: myName, emailPrefix: myEmailPrefix, statusMessage: myStatusMessage, gridPos: myGridPos })
+    if (sceneReadyRef.current) {
+      EventBus.emit(GameEvents.MY_INFO_UPDATE, { name: myName, emailPrefix: myEmailPrefix, statusMessage: myStatusMessage, gridPos: myGridPos })
+    }
   }, [myName, myEmailPrefix, myStatusMessage, myGridPos])
 
   return (

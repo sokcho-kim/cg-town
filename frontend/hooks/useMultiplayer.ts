@@ -49,7 +49,7 @@ export function useMultiplayer() {
       return
     }
 
-    setMyName(session.user?.user_metadata?.name || session.user?.email || '')
+    setMyName(session.user?.user_metadata?.username || session.user?.user_metadata?.name || session.user?.email || '')
 
     const ws = new WebSocket(`${WS_URL}/ws?token=${session.access_token}`)
     wsRef.current = ws

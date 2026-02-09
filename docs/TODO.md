@@ -29,8 +29,9 @@
 |---|------|------|------|------|
 | 3 | ~~로그아웃 기능~~ | 지민 | DONE | 게임 + 도감 페이지 |
 | 4 | ~~관리자 일괄 등록 스크립트~~ | 지민 | DONE | `scripts/bulk-register.js` |
-| 4b | CSV 작성 + 일괄 등록 실행 | 은빈 | TODO | `scripts/users.csv` 30명 작성 → `node bulk-register.js` |
-| 4c | 캐릭터 이미지 제작 + Storage 업로드 | 은빈 | TODO | 피그마 Export → Supabase Storage `characters/{email_prefix}/` |
+| 4b | ~~CSV 작성 + 일괄 등록 실행~~ | 지민 | DONE | 28명 등록 완료, 아바타 동물 상태메시지 부여 |
+| 4c | ~~캐릭터 이미지 Storage 업로드~~ | 지민 | DONE | Gemini 이미지 분류/리사이즈(128x256) → Supabase Storage 업로드 |
+| 4d | 캐릭터 비율 수정 | 지민 | TODO | 게임 내 캐릭터 표시 비율(TILE_SIZE x TILE_SIZE*1.5 = 64x96) 확인 필요, 찌그러짐 이슈 |
 | 5 | ~~캐릭터 머리 위 상태 텍스트~~ | 지민 | DONE | `status_message` 컬럼 + Phaser 표시 |
 
 ---
@@ -59,10 +60,10 @@
 | 13e | ~~하이브리드 검색 (pgvector + tsvector)~~ | 지민 | DONE | RRF 알고리즘, `migration_hybrid_search.sql` 실행 완료 |
 | 13f | ~~SSE 스트리밍 응답~~ | 지민 | DONE | `/chat/stream` 엔드포인트, 실시간 토큰 출력 |
 | 13g | ~~PDF/DOCX 파일 업로드 지원~~ | 지민 | DONE | pypdf + python-docx, 50MB 제한 |
-| 14 | ~~RAG 테스트 페이지~~ | 지민 | DONE | `/admin/rag-test` 호비 AI 트레이너 (파일 업로드 + 채팅 + 설정) |
-| 15 | 정형데이터 질의 (TAG) | 지민 | TODO | DB 직접 조회 (코드 구현 완료, 테스트 필요) |
+| 14 | ~~RAG 테스트 페이지~~ | 지민 | DONE | `/admin/hop-e` 호비 AI 트레이너 (파일 업로드 + 채팅 + 설정) |
+| 15 | ~~정형데이터 질의 (TAG)~~ | 지민 | DONE | DB 직접 조회 (E2E 테스트 통과) |
 | 16 | NPC 채팅 UI | 은빈+지민 | TODO | 게임 내 채팅창, NPC 근처 대화 |
-| 16b | NPC 캐릭터 에셋 | 은빈 | TODO | NPC 전용 캐릭터 디자인 + Storage 업로드 |
+| 16b | ~~NPC 캐릭터 에셋 (hop-e)~~ | 지민 | DONE | hop-e NPC 이미지 Supabase Storage 업로드 완료 |
 | 17 | 입사 서류 다운로드 | 지민 | TODO | NPC 안내 + 파일 다운로드 |
 
 ---
@@ -136,7 +137,13 @@
 - [x] tests/ 폴더 구조 생성
 - [x] 문서화 (TODO.md, SETUP-GUIDE.md)
 - [x] 기본 캐릭터 이미지 (Sprout Lands 추출, 로컬 폴백)
-- [x] 호비 AI 트레이너 RAG 테스트 페이지 (`/admin/rag-test`)
+- [x] 호비 AI 트레이너 RAG 테스트 페이지 (`/admin/hop-e`)
+- [x] 28명 사원 일괄 등록 + 아바타 동물 상태메시지
+- [x] 캐릭터 이미지 분류/리사이즈/업로드 (27명 × 5방향 = 135장)
+- [x] hop-e NPC 이미지 Supabase Storage 업로드
+- [x] rag-test → hop-e 페이지 리네임
+- [x] Phaser React Strict Mode 크래시 수정 (EventBus 정리, isShutDown 가드)
+- [x] TAG E2E 테스트 통과
 - [x] FAISS → pgvector 마이그레이션 (Supabase DB 벡터 검색)
 - [x] 파일 업로드 → 자동 임베딩 생성 기능
 - [x] TAG/RAG 하이브리드 라우팅 구현

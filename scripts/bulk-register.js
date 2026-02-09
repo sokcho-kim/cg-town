@@ -103,19 +103,22 @@ async function fetchExistingEmails() {
  * delay before the row materialises in the profiles table, so we retry a
  * few times.
  */
-async function updateProfile(userId, { username, department, position, isNpc }) {
+async function updateProfile(userId, { username, department, position, isNpc, statusMessage }) {
   const maxRetries = 5;
   const retryDelay = 800; // ms
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const updates = {
+      username,
+      department,
+      position,
+      is_npc: isNpc,
+    };
+    if (statusMessage) updates.status_message = statusMessage;
+
     const { error } = await supabase
       .from("profiles")
-      .update({
-        username,
-        department,
-        position,
-        is_npc: isNpc,
-      })
+      .update(updates)
       .eq("id", userId);
 
     if (!error) return { success: true };
@@ -172,6 +175,7 @@ async function main() {
     const department = (row.department ?? "").trim();
     const position = (row.position ?? "").trim();
     const isNpc = (row.is_npc ?? "false").trim().toLowerCase() === "true";
+    const statusMessage = (row.status_message ?? "").trim();
 
     if (!email) {
       console.log(`  [SKIP] Row missing email: ${JSON.stringify(row)}`);
@@ -208,6 +212,7 @@ async function main() {
           department,
           position,
           isNpc,
+          statusMessage,
         });
         if (result?.success) {
           console.log(`         -> profile updated (department, position, is_npc)`);
@@ -245,6 +250,7 @@ async function main() {
       department,
       position,
       isNpc,
+      statusMessage,
     });
 
     if (profileResult?.success) {
