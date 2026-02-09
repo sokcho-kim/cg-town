@@ -1,13 +1,17 @@
-"""NPC 채팅 API 엔드포인트"""
-import os
-from fastapi import APIRouter, Depends, HTTPException
+"""NPC 채팅 API 엔드포인트 (pgvector 기반)"""
+import logging
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from api.deps import get_current_user
+from lib.supabase import get_supabase_client
 from rag.router import classify_and_route
-from rag.vector_store import build_vector_store, get_vector_store
-from rag.document_loader import load_knowledge_base
-from rag.config import get_settings, save_settings, KNOWLEDGE_BASE_DIR
+from rag.vector_store import embed_and_store_document, rebuild_all_embeddings, get_total_chunks
+from rag.config import get_settings, save_settings
+
+logger = logging.getLogger(__name__)
+
+ALLOWED_EXTENSIONS = {".md", ".txt"}
 
 router = APIRouter(prefix="/api/npc")
 
@@ -81,79 +85,192 @@ async def update_npc_settings(body: SettingsRequest, current_user=Depends(get_cu
     return current
 
 
-# ===== 문서 관리 =====
+# ===== 문서 관리 (Supabase DB) =====
 
 
 @router.get("/documents")
 async def list_documents(current_user=Depends(get_current_user)):
     """지식베이스 문서 목록 조회"""
-    chunks = load_knowledge_base()
+    supabase = get_supabase_client()
 
-    files: dict[str, int] = {}
-    for chunk in chunks:
-        source = chunk.metadata.get("source", "unknown")
-        files[source] = files.get(source, 0) + 1
+    docs = supabase.table("knowledge_documents").select("id, filename").execute()
 
-    return {
-        "total_chunks": len(chunks),
-        "files": [
-            {"filename": name, "chunk_count": count}
-            for name, count in sorted(files.items())
-        ],
-    }
+    files = []
+    for doc in docs.data or []:
+        chunk_result = (
+            supabase.table("knowledge_chunks")
+            .select("id", count="exact")
+            .eq("document_id", doc["id"])
+            .execute()
+        )
+        files.append({
+            "filename": doc["filename"],
+            "chunk_count": chunk_result.count or 0,
+        })
+
+    total = get_total_chunks()
+    return {"total_chunks": total, "files": files}
 
 
 @router.get("/documents/{filename}")
 async def get_document(filename: str, current_user=Depends(get_current_user)):
     """문서 내용 조회"""
-    file_path = os.path.join(KNOWLEDGE_BASE_DIR, filename)
-    if not os.path.exists(file_path) or not filename.endswith(".md"):
+    supabase = get_supabase_client()
+
+    result = (
+        supabase.table("knowledge_documents")
+        .select("filename, content")
+        .eq("filename", filename)
+        .single()
+        .execute()
+    )
+
+    if not result.data:
         raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
 
-    with open(file_path, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    return {"filename": filename, "content": content}
+    return {"filename": result.data["filename"], "content": result.data["content"]}
 
 
 @router.post("/documents")
 async def create_document(body: DocumentRequest, current_user=Depends(get_current_user)):
-    """새 문서 추가"""
-    filename = body.title if body.title.endswith(".md") else f"{body.title}.md"
-    file_path = os.path.join(KNOWLEDGE_BASE_DIR, filename)
+    """새 문서 추가 (텍스트 입력)"""
+    supabase = get_supabase_client()
+    filename = body.title if body.title.endswith((".md", ".txt")) else f"{body.title}.md"
 
-    if os.path.exists(file_path):
+    # 중복 체크
+    existing = (
+        supabase.table("knowledge_documents")
+        .select("id")
+        .eq("filename", filename)
+        .execute()
+    )
+    if existing.data:
         raise HTTPException(status_code=409, detail="같은 이름의 문서가 이미 존재합니다.")
 
-    os.makedirs(KNOWLEDGE_BASE_DIR, exist_ok=True)
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(body.content)
+    # 문서 저장
+    result = (
+        supabase.table("knowledge_documents")
+        .insert({"filename": filename, "content": body.content})
+        .execute()
+    )
+    doc_id = result.data[0]["id"]
 
-    return {"filename": filename, "message": "문서가 생성되었습니다."}
+    # 임베딩 생성 + 저장
+    chunk_count = embed_and_store_document(doc_id, filename, body.content)
+
+    return {
+        "filename": filename,
+        "message": f"문서가 생성되었습니다. ({chunk_count}개 청크)",
+        "auto_rebuilt": True,
+    }
 
 
 @router.put("/documents/{filename}")
 async def update_document(filename: str, body: DocumentRequest, current_user=Depends(get_current_user)):
     """문서 수정"""
-    file_path = os.path.join(KNOWLEDGE_BASE_DIR, filename)
-    if not os.path.exists(file_path) or not filename.endswith(".md"):
+    supabase = get_supabase_client()
+
+    existing = (
+        supabase.table("knowledge_documents")
+        .select("id")
+        .eq("filename", filename)
+        .single()
+        .execute()
+    )
+    if not existing.data:
         raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
 
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(body.content)
+    doc_id = existing.data["id"]
 
-    return {"filename": filename, "message": "문서가 수정되었습니다."}
+    # 문서 내용 업데이트
+    supabase.table("knowledge_documents").update({"content": body.content}).eq("id", doc_id).execute()
+
+    # 임베딩 재생성
+    chunk_count = embed_and_store_document(doc_id, filename, body.content)
+
+    return {
+        "filename": filename,
+        "message": f"문서가 수정되었습니다. ({chunk_count}개 청크)",
+        "auto_rebuilt": True,
+    }
 
 
 @router.delete("/documents/{filename}")
 async def delete_document(filename: str, current_user=Depends(get_current_user)):
-    """문서 삭제"""
-    file_path = os.path.join(KNOWLEDGE_BASE_DIR, filename)
-    if not os.path.exists(file_path) or not filename.endswith(".md"):
+    """문서 삭제 (연결된 청크도 cascade 삭제)"""
+    supabase = get_supabase_client()
+
+    existing = (
+        supabase.table("knowledge_documents")
+        .select("id")
+        .eq("filename", filename)
+        .execute()
+    )
+    if not existing.data:
         raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
 
-    os.remove(file_path)
-    return {"filename": filename, "message": "문서가 삭제되었습니다."}
+    supabase.table("knowledge_documents").delete().eq("filename", filename).execute()
+
+    total = get_total_chunks()
+    return {
+        "filename": filename,
+        "message": f"문서가 삭제되었습니다. (남은 청크: {total}개)",
+        "auto_rebuilt": True,
+    }
+
+
+@router.post("/documents/upload")
+async def upload_document(file: UploadFile = File(...), current_user=Depends(get_current_user)):
+    """파일 업로드로 문서 추가 (.md, .txt)"""
+    import os
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="파일 이름이 없습니다.")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"지원하지 않는 파일 형식입니다. ({', '.join(ALLOWED_EXTENSIONS)}만 가능)",
+        )
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        try:
+            text = content.decode("euc-kr")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="파일 인코딩을 읽을 수 없습니다. UTF-8 또는 EUC-KR만 지원합니다.")
+
+    supabase = get_supabase_client()
+
+    # 기존 문서 있으면 업데이트, 없으면 생성
+    existing = (
+        supabase.table("knowledge_documents")
+        .select("id")
+        .eq("filename", file.filename)
+        .execute()
+    )
+
+    if existing.data:
+        doc_id = existing.data[0]["id"]
+        supabase.table("knowledge_documents").update({"content": text}).eq("id", doc_id).execute()
+    else:
+        result = (
+            supabase.table("knowledge_documents")
+            .insert({"filename": file.filename, "content": text})
+            .execute()
+        )
+        doc_id = result.data[0]["id"]
+
+    chunk_count = embed_and_store_document(doc_id, file.filename, text)
+
+    return {
+        "filename": file.filename,
+        "message": f"'{file.filename}' 업로드 완료 ({chunk_count}개 청크)",
+        "auto_rebuilt": True,
+    }
 
 
 # ===== 인덱스 =====
@@ -161,22 +278,20 @@ async def delete_document(filename: str, current_user=Depends(get_current_user))
 
 @router.post("/rebuild-index")
 async def rebuild_index(current_user=Depends(get_current_user)):
-    """지식베이스 인덱스 재빌드"""
-    store = build_vector_store()
-    doc_count = len(store.docstore._dict)
-    return {"message": f"인덱스 재빌드 완료 ({doc_count}개 청크)"}
+    """전체 임베딩 재빌드"""
+    total = rebuild_all_embeddings()
+    return {"message": f"인덱스 재빌드 완료 ({total}개 청크)"}
 
 
 @router.get("/health")
 async def npc_health():
     """NPC 시스템 상태 확인"""
     try:
-        store = get_vector_store()
-        doc_count = len(store.docstore._dict)
+        total = get_total_chunks()
         return {
             "status": "healthy",
-            "vector_store": "loaded",
-            "document_count": doc_count,
+            "vector_store": "pgvector",
+            "document_count": total,
         }
     except Exception as e:
         return {

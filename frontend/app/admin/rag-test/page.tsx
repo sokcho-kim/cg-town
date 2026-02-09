@@ -53,6 +53,9 @@ export default function HobiTrainerPage() {
   const [showNewDoc, setShowNewDoc] = useState(false)
   const [rebuilding, setRebuilding] = useState(false)
 
+  // Upload state
+  const [uploading, setUploading] = useState(false)
+
   // Settings state
   const [settings, setSettings] = useState<Settings>({
     system_prompt: '',
@@ -175,6 +178,26 @@ export default function HobiTrainerPage() {
     }
   }
 
+  async function handleUploadFiles(files: FileList | File[]) {
+    const fileArray = Array.from(files)
+    const allowed = fileArray.filter((f) => f.name.endsWith('.md') || f.name.endsWith('.txt'))
+    if (allowed.length === 0) {
+      alert('.md 또는 .txt 파일만 업로드할 수 있습니다.')
+      return
+    }
+    setUploading(true)
+    try {
+      for (const file of allowed) {
+        await api.upload('/api/npc/documents/upload', file)
+      }
+      await fetchDocuments()
+    } catch (err) {
+      alert(`업로드 실패: ${err}`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
   async function handleRebuildIndex() {
     if (rebuilding) return
     setRebuilding(true)
@@ -259,6 +282,7 @@ export default function HobiTrainerPage() {
                 newDocTitle={newDocTitle}
                 newDocContent={newDocContent}
                 rebuilding={rebuilding}
+                uploading={uploading}
                 onSelectDoc={fetchDocContent}
                 onSetDocContent={setDocContent}
                 onSetDocEditing={setDocEditing}
@@ -269,6 +293,7 @@ export default function HobiTrainerPage() {
                 onSetNewDocContent={setNewDocContent}
                 onCreateDoc={handleCreateDoc}
                 onRebuildIndex={handleRebuildIndex}
+                onUploadFiles={handleUploadFiles}
               />
             ) : (
               <SettingsPanel
@@ -394,9 +419,10 @@ export default function HobiTrainerPage() {
 
 function KnowledgeBasePanel({
   documents, totalChunks, selectedDoc, docContent, docEditing,
-  showNewDoc, newDocTitle, newDocContent, rebuilding,
+  showNewDoc, newDocTitle, newDocContent, rebuilding, uploading,
   onSelectDoc, onSetDocContent, onSetDocEditing, onSaveDoc, onDeleteDoc,
   onSetShowNewDoc, onSetNewDocTitle, onSetNewDocContent, onCreateDoc, onRebuildIndex,
+  onUploadFiles,
 }: {
   documents: DocumentInfo[]
   totalChunks: number
@@ -407,6 +433,7 @@ function KnowledgeBasePanel({
   newDocTitle: string
   newDocContent: string
   rebuilding: boolean
+  uploading: boolean
   onSelectDoc: (f: string) => void
   onSetDocContent: (c: string) => void
   onSetDocEditing: (b: boolean) => void
@@ -417,9 +444,54 @@ function KnowledgeBasePanel({
   onSetNewDocContent: (c: string) => void
   onCreateDoc: () => void
   onRebuildIndex: () => void
+  onUploadFiles: (files: FileList | File[]) => void
 }) {
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   return (
     <div className="space-y-4">
+      {/* 파일 업로드 드래그앤드롭 영역 */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragOver(false)
+          if (e.dataTransfer.files.length > 0) onUploadFiles(e.dataTransfer.files)
+        }}
+        onClick={() => fileInputRef.current?.click()}
+        className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+          dragOver
+            ? 'border-blue-400 bg-blue-50'
+            : uploading
+              ? 'border-gray-300 bg-gray-50'
+              : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+        }`}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".md,.txt"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              onUploadFiles(e.target.files)
+              e.target.value = ''
+            }
+          }}
+        />
+        {uploading ? (
+          <p className="text-sm text-gray-500 animate-pulse">업로드 + 인덱싱 중...</p>
+        ) : (
+          <>
+            <p className="text-sm text-gray-500">파일을 드래그하거나 클릭하여 업로드</p>
+            <p className="text-xs text-gray-400 mt-1">.md, .txt 지원</p>
+          </>
+        )}
+      </div>
+
       {/* 문서 목록 헤더 */}
       <div className="flex items-center justify-between">
         <div>

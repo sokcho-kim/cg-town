@@ -4,9 +4,11 @@ import json
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
-KNOWLEDGE_BASE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "knowledge_base")
-FAISS_INDEX_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "faiss_index")
+# 로컬 설정 파일 (시스템 프롬프트, 모델 설정 등)
 SETTINGS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "settings.json")
+
+# 레거시 경로 (기존 로컬 파일 마이그레이션용)
+KNOWLEDGE_BASE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "knowledge_base")
 
 DEFAULTS = {
     "system_prompt": "당신은 CG Inside 회사의 온보딩 도우미 NPC '호비'입니다.\n신입사원의 질문에 친절하고 정확하게 답변합니다.",

@@ -6,13 +6,13 @@ export async function apiClient(endpoint: string, options: RequestInit = {}) {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...options.headers,
+  const isFormData = options.body instanceof FormData
+  const headers: Record<string, string> = {
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
   }
 
   if (session?.access_token) {
-    (headers as Record<string, string>)['Authorization'] = `Bearer ${session.access_token}`
+    headers['Authorization'] = `Bearer ${session.access_token}`
   }
 
   const response = await fetch(`${API_URL}${endpoint}`, {
@@ -34,4 +34,9 @@ export const api = {
   post: (endpoint: string, data: unknown) => apiClient(endpoint, { method: 'POST', body: JSON.stringify(data) }),
   put: (endpoint: string, data: unknown) => apiClient(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (endpoint: string) => apiClient(endpoint, { method: 'DELETE' }),
+  upload: (endpoint: string, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient(endpoint, { method: 'POST', body: formData })
+  },
 }

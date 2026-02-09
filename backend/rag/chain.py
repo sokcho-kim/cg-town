@@ -1,29 +1,32 @@
-"""LangChain RAG 체인 구성"""
+"""LangChain RAG 체인 구성 (pgvector)"""
+import json
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from rag.config import OPENAI_API_KEY, get_settings
-from rag.vector_store import get_vector_store
+from rag.vector_store import search_similar
 
 
-def format_docs(docs) -> str:
+def format_docs(docs: list[dict]) -> str:
     """검색된 문서들을 문자열로 포맷"""
-    return "\n\n---\n\n".join(
-        f"[출처: {doc.metadata.get('source', '알 수 없음')}]\n{doc.page_content}"
-        for doc in docs
-    )
+    parts = []
+    for doc in docs:
+        metadata = doc.get("metadata", {})
+        if isinstance(metadata, str):
+            metadata = json.loads(metadata)
+        source = metadata.get("source", "알 수 없음")
+        parts.append(f"[출처: {source}]\n{doc['content']}")
+    return "\n\n---\n\n".join(parts)
 
 
 async def query_rag(question: str) -> dict:
-    """RAG 파이프라인으로 질문에 답변"""
+    """RAG 파이프라인으로 질문에 답변 (pgvector 검색)"""
     settings = get_settings()
 
-    vector_store = get_vector_store()
-    retriever = vector_store.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": settings["retrieval_k"]},
+    # pgvector 유사도 검색
+    retrieved_docs = search_similar(
+        query=question,
+        k=settings["retrieval_k"],
     )
-
-    retrieved_docs = retriever.invoke(question)
 
     llm = ChatOpenAI(
         model=settings["chat_model"],
@@ -44,12 +47,14 @@ async def query_rag(question: str) -> dict:
     result = {"answer": response.content}
 
     if settings.get("show_sources", True):
-        result["sources"] = [
-            {
-                "source": doc.metadata.get("source", ""),
-                "content": doc.page_content[:200],
-            }
-            for doc in retrieved_docs
-        ]
+        result["sources"] = []
+        for doc in retrieved_docs:
+            metadata = doc.get("metadata", {})
+            if isinstance(metadata, str):
+                metadata = json.loads(metadata)
+            result["sources"].append({
+                "source": metadata.get("source", ""),
+                "content": doc["content"][:200],
+            })
 
     return result
