@@ -88,6 +88,9 @@ class MainScene extends Phaser.Scene {
     this.load.image('trees', '/images/sprout-lands/objects/Trees_stumps_bushes.png')
     this.load.image('grass_biom', '/images/sprout-lands/objects/Basic_Grass_Biom_things.png')
     this.load.image('mushrooms_flowers', '/images/sprout-lands/objects/Mushrooms_Flowers_Stones.png')
+    this.load.image('farm_tileset', '/images/sprout-lands/tilesets/free_sample_tileset.png')
+    this.load.image('coastal_furniture', '/images/sprout-lands/objects/coastal_furnitureset_withshadow.png')
+    this.load.image('office', '/images/office/office_tileset.png')
 
     // 기본 캐릭터 에셋 로드 (커스텀 이미지가 없는 유저용 폴백)
     this.loadUserAssets('default')
@@ -125,31 +128,32 @@ class MainScene extends Phaser.Scene {
     const treesTileset = map.addTilesetImage('trees', 'trees')
     const grassBiomTileset = map.addTilesetImage('grass_biom', 'grass_biom')
     const mushroomsTileset = map.addTilesetImage('mushrooms_flowers', 'mushrooms_flowers')
+    const farmTileset = map.addTilesetImage('farm_tileset', 'farm_tileset')
+    const coastalTileset = map.addTilesetImage('coastal_furniture', 'coastal_furniture')
+    const officeTileset = map.addTilesetImage('office', 'office')
 
     // 모든 타일셋 배열 (각 레이어에서 필요한 타일셋을 참조)
     const allTilesets = [
       grassTileset, waterTileset, stonePathTileset, fencesTileset,
-      hillsTileset, treesTileset, grassBiomTileset, mushroomsTileset
+      hillsTileset, treesTileset, grassBiomTileset, mushroomsTileset, farmTileset, coastalTileset, officeTileset
     ].filter((ts): ts is Phaser.Tilemaps.Tileset => ts !== null)
 
     // 레이어 생성 (바닥부터 위로 쌓기, 모두 배경 깊이)
     const groundLayer = map.createLayer('ground', allTilesets, 0, 0)
     groundLayer?.setDepth(-10)
 
-    const waterLayer = map.createLayer('water', allTilesets, 0, 0)
-    waterLayer?.setDepth(-9)
+    const officeChairLayer = map.createLayer('office chair', allTilesets, 0, 0)
+    officeChairLayer?.setDepth(-9)
 
-    const pathsLayer = map.createLayer('paths', allTilesets, 0, 0)
-    pathsLayer?.setDepth(-8)
+    const decoLayer = map.createLayer('deco', allTilesets, 0, 0)
+    decoLayer?.setDepth(-8)
 
-    const fencesLayer = map.createLayer('fences', allTilesets, 0, 0)
-    fencesLayer?.setDepth(-7)
+    const deco2Layer = map.createLayer('deco 2', allTilesets, 0, 0)
+    deco2Layer?.setDepth(-7)
 
-    const decorationsLayer = map.createLayer('decorations', allTilesets, 0, 0)
-    decorationsLayer?.setDepth(-6)
-
-    // 카메라 설정 (맵 경계 설정)
-    this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT)
+    // 카메라 설정 (맵 경계 + 상단 여백으로 데코 요소 잘림 방지)
+    const cameraPadding = TILE_SIZE
+    this.cameras.main.setBounds(-cameraPadding, -cameraPadding, MAP_WIDTH + cameraPadding * 2, MAP_HEIGHT + cameraPadding * 2)
 
     // 플레이어 스프라이트 생성 (텍스처는 MY_INFO_UPDATE에서 설정)
     this.player = this.add.sprite(
@@ -204,6 +208,10 @@ class MainScene extends Phaser.Scene {
     // EventBus 이벤트 리스너 등록
     this.setupEventListeners()
 
+    // 씬 종료 시 EventBus 리스너 정리
+    this.events.on('shutdown', this.shutdown, this)
+    this.events.on('destroy', this.shutdown, this)
+
     // 씬 준비 완료 이벤트 발생
     EventBus.emit(GameEvents.SCENE_READY, this)
   }
@@ -223,25 +231,28 @@ class MainScene extends Phaser.Scene {
    * 내 정보 업데이트 핸들러
    */
   private handleMyInfoUpdate = (data: { name: string; emailPrefix: string; statusMessage: string; gridPos: { x: number; y: number } | null }) => {
-    this.myName = data.name
+    // 씬이 파괴된 경우 무시
+    if (!this.sys || !this.scene) return
+
+    this.myName = data.name || ''
     if (data.emailPrefix && data.emailPrefix !== this.myEmailPrefix) {
       this.myEmailPrefix = data.emailPrefix
       // 내 캐릭터 에셋 동적 로드
       this.loadUserAssets(data.emailPrefix)
       this.load.once('complete', () => {
-        if (this.player) {
+        if (this.player?.active) {
           this.player.setTexture(this.getTextureKey(this.myEmailPrefix, this.direction))
         }
       })
       this.load.start()
     }
-    if (this.playerNameText) {
-      this.playerNameText.setText(data.name)
+    if (this.playerNameText?.active) {
+      this.playerNameText.setText(this.myName)
     }
 
     // 상태 메시지 업데이트
     this.myStatusMessage = data.statusMessage || ''
-    if (this.playerStatusText) {
+    if (this.playerStatusText?.active) {
       this.playerStatusText.setText(this.myStatusMessage)
     }
 
