@@ -7,6 +7,7 @@ interface PlayerInfo {
   email: string
   email_prefix: string
   name: string
+  status_message?: string
 }
 
 interface PlayerPosition {
@@ -27,6 +28,7 @@ export function useMultiplayer() {
   const [isConnected, setIsConnected] = useState(false)
   const [myName, setMyName] = useState<string>('')
   const [myEmailPrefix, setMyEmailPrefix] = useState<string>('')
+  const [myStatusMessage, setMyStatusMessage] = useState<string>('')
   const [myGridPos, setMyGridPos] = useState<{ x: number; y: number } | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -68,6 +70,9 @@ export function useMultiplayer() {
           }
           if (data.your_email_prefix) {
             setMyEmailPrefix(data.your_email_prefix)
+          }
+          if (data.your_status_message !== undefined) {
+            setMyStatusMessage(data.your_status_message || '')
           }
           break
         case 'player_joined':
@@ -142,5 +147,5 @@ export function useMultiplayer() {
     }
   }, [])
 
-  return { remotePlayers, isConnected, sendPosition, myName, myEmailPrefix, myGridPos }
+  return { remotePlayers, isConnected, sendPosition, myName, myEmailPrefix, myStatusMessage, myGridPos }
 }

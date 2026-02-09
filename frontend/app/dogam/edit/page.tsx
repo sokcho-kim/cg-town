@@ -9,10 +9,12 @@ interface Profile {
   id: string
   username: string
   department: string
+  position: string
   field: string
-  project: string
+  projects: string[]
   tmi: string
   tech_stack: string[]
+  status_message: string
 }
 
 export default function DogamEditPage() {
@@ -21,12 +23,14 @@ export default function DogamEditPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [techInput, setTechInput] = useState('')
+  const [projectInput, setProjectInput] = useState('')
 
   // 폼 상태
   const [field, setField] = useState('')
-  const [project, setProject] = useState('')
+  const [projects, setProjects] = useState<string[]>([])
   const [tmi, setTmi] = useState('')
   const [techStack, setTechStack] = useState<string[]>([])
+  const [statusMessage, setStatusMessage] = useState('')
 
   useEffect(() => {
     async function fetchMyProfile() {
@@ -46,9 +50,17 @@ export default function DogamEditPage() {
       if (data) {
         setProfile(data)
         setField(data.field || '')
-        setProject(data.project || '')
+        // Support legacy single-string project field and new array projects field
+        if (Array.isArray(data.projects)) {
+          setProjects(data.projects)
+        } else if (data.project && typeof data.project === 'string') {
+          setProjects(data.project ? [data.project] : [])
+        } else {
+          setProjects([])
+        }
         setTmi(data.tmi || '')
         setTechStack(data.tech_stack || [])
+        setStatusMessage(data.status_message || '')
       }
       setLoading(false)
     }
@@ -64,9 +76,10 @@ export default function DogamEditPage() {
       .from('profiles')
       .update({
         field,
-        project,
+        projects,
         tmi,
         tech_stack: techStack,
+        status_message: statusMessage,
       })
       .eq('id', profile.id)
 
@@ -74,6 +87,7 @@ export default function DogamEditPage() {
     router.push(`/dogam/${profile.id}`)
   }
 
+  // Tech stack tag helpers
   const addTech = () => {
     const trimmed = techInput.trim()
     if (trimmed && !techStack.includes(trimmed)) {
@@ -90,6 +104,26 @@ export default function DogamEditPage() {
     if (e.key === 'Enter') {
       e.preventDefault()
       addTech()
+    }
+  }
+
+  // Project tag helpers
+  const addProject = () => {
+    const trimmed = projectInput.trim()
+    if (trimmed && !projects.includes(trimmed)) {
+      setProjects([...projects, trimmed])
+      setProjectInput('')
+    }
+  }
+
+  const removeProject = (proj: string) => {
+    setProjects(projects.filter((p) => p !== proj))
+  }
+
+  const handleProjectKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      addProject()
     }
   }
 
@@ -128,8 +162,8 @@ export default function DogamEditPage() {
             내 프로필 편집
           </h1>
 
-          {/* Name & Department (read-only) */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          {/* Name, Department, Position (read-only) */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
             <div>
               <label className="text-gray-400 text-sm block mb-1">이름</label>
               <div className="bg-gray-800/50 text-gray-300 px-3 py-2 rounded-lg text-sm">
@@ -142,6 +176,28 @@ export default function DogamEditPage() {
                 {profile.department || '-'}
               </div>
             </div>
+            <div>
+              <label className="text-gray-400 text-sm block mb-1">직급</label>
+              <div className="bg-gray-800/50 text-gray-300 px-3 py-2 rounded-lg text-sm">
+                {profile.position || '-'}
+              </div>
+            </div>
+          </div>
+
+          {/* Status Message */}
+          <div className="mb-4">
+            <label className="text-gray-400 text-sm block mb-1">상태 메시지</label>
+            <input
+              type="text"
+              value={statusMessage}
+              onChange={(e) => setStatusMessage(e.target.value)}
+              placeholder="예: 휴가 중, 외근, 파견 - 게임 내 머리 위에 표시됩니다"
+              maxLength={30}
+              className="w-full bg-gray-800/50 text-white px-3 py-2 rounded-lg text-sm border border-gray-700 focus:border-indigo-500 focus:outline-none"
+            />
+            <p className="text-gray-600 text-xs mt-1">
+              {statusMessage.length}/30
+            </p>
           </div>
 
           {/* Field */}
@@ -156,16 +212,41 @@ export default function DogamEditPage() {
             />
           </div>
 
-          {/* Project */}
+          {/* Projects (tag input) */}
           <div className="mb-4">
             <label className="text-gray-400 text-sm block mb-1">현재 프로젝트</label>
-            <input
-              type="text"
-              value={project}
-              onChange={(e) => setProject(e.target.value)}
-              placeholder="예: CG Town"
-              className="w-full bg-gray-800/50 text-white px-3 py-2 rounded-lg text-sm border border-gray-700 focus:border-indigo-500 focus:outline-none"
-            />
+            <div className="flex gap-2 mb-2 flex-wrap">
+              {projects.map((proj, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-500/20 text-cyan-300 rounded-lg text-sm"
+                >
+                  {proj}
+                  <button
+                    onClick={() => removeProject(proj)}
+                    className="text-cyan-400 hover:text-white ml-1"
+                  >
+                    x
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={projectInput}
+                onChange={(e) => setProjectInput(e.target.value)}
+                onKeyDown={handleProjectKeyDown}
+                placeholder="프로젝트명 입력 후 Enter"
+                className="flex-1 bg-gray-800/50 text-white px-3 py-2 rounded-lg text-sm border border-gray-700 focus:border-indigo-500 focus:outline-none"
+              />
+              <button
+                onClick={addProject}
+                className="px-3 py-2 bg-gray-700 text-white rounded-lg text-sm hover:bg-gray-600"
+              >
+                추가
+              </button>
+            </div>
           </div>
 
           {/* Tech Stack */}

@@ -27,6 +27,7 @@ interface PlayerInfo {
   email: string
   email_prefix: string
   name: string
+  status_message?: string
 }
 
 interface RemotePlayer {
@@ -40,6 +41,7 @@ interface PhaserGameProps {
   isConnected: boolean
   myName: string
   myEmailPrefix: string
+  myStatusMessage: string
   myGridPos: { x: number; y: number } | null
   onPositionChange: (gridX: number, gridY: number, direction: string) => void
 }
@@ -58,6 +60,7 @@ class MainScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private player!: Phaser.GameObjects.Sprite
   private playerNameText!: Phaser.GameObjects.Text
+  private playerStatusText!: Phaser.GameObjects.Text
   private remotePlayerSprites: Map<string, Phaser.GameObjects.Container> = new Map()
   private gridX: number = 12
   private gridY: number = 6
@@ -65,6 +68,7 @@ class MainScene extends Phaser.Scene {
   private direction: string = 'down'
   private myName: string = ''
   private myEmailPrefix: string = ''
+  private myStatusMessage: string = ''
   private loadedUsers: Set<string> = new Set()
 
   constructor() {
@@ -150,6 +154,22 @@ class MainScene extends Phaser.Scene {
     this.playerNameText.setOrigin(0.5, 1)
     this.playerNameText.setDepth(1000)
 
+    // 플레이어 상태 메시지 텍스트 (이름 아래에 표시)
+    this.playerStatusText = this.add.text(
+      this.player.x,
+      this.player.y - TILE_SIZE + 14,
+      this.myStatusMessage,
+      {
+        fontSize: '11px',
+        color: '#fbbf24',
+        stroke: '#000000',
+        strokeThickness: 2,
+        align: 'center',
+      }
+    )
+    this.playerStatusText.setOrigin(0.5, 0)
+    this.playerStatusText.setDepth(1000)
+
     // 카메라가 플레이어를 따라가도록 설정
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
 
@@ -179,7 +199,7 @@ class MainScene extends Phaser.Scene {
   /**
    * 내 정보 업데이트 핸들러
    */
-  private handleMyInfoUpdate = (data: { name: string; emailPrefix: string; gridPos: { x: number; y: number } | null }) => {
+  private handleMyInfoUpdate = (data: { name: string; emailPrefix: string; statusMessage: string; gridPos: { x: number; y: number } | null }) => {
     this.myName = data.name
     if (data.emailPrefix && data.emailPrefix !== this.myEmailPrefix) {
       this.myEmailPrefix = data.emailPrefix
@@ -194,6 +214,12 @@ class MainScene extends Phaser.Scene {
     }
     if (this.playerNameText) {
       this.playerNameText.setText(data.name)
+    }
+
+    // 상태 메시지 업데이트
+    this.myStatusMessage = data.statusMessage || ''
+    if (this.playerStatusText) {
+      this.playerStatusText.setText(this.myStatusMessage)
     }
 
     // 초기 위치 설정
@@ -231,10 +257,18 @@ class MainScene extends Phaser.Scene {
         this.load.start()
       }
 
+      const remoteStatusMsg = user_info?.status_message || ''
+
       if (this.remotePlayerSprites.has(userId)) {
         // 기존 플레이어 업데이트
         const container = this.remotePlayerSprites.get(userId)!
         const sprite = container.getAt(0) as Phaser.GameObjects.Sprite
+
+        // 상태 메시지 텍스트 업데이트 (container의 3번째 자식)
+        const statusText = container.getAt(2) as Phaser.GameObjects.Text | undefined
+        if (statusText) {
+          statusText.setText(remoteStatusMsg)
+        }
 
         // 위치 트윈 애니메이션
         this.tweens.add({
@@ -269,7 +303,16 @@ class MainScene extends Phaser.Scene {
         })
         nameText.setOrigin(0.5, 1)
 
-        container.add([sprite, nameText])
+        const statusText = this.add.text(0, -TILE_SIZE + 14, remoteStatusMsg, {
+          fontSize: '11px',
+          color: '#fbbf24',
+          stroke: '#000000',
+          strokeThickness: 2,
+          align: 'center',
+        })
+        statusText.setOrigin(0.5, 0)
+
+        container.add([sprite, nameText, statusText])
         container.setDepth(position.gridY)
 
         this.remotePlayerSprites.set(userId, container)
@@ -349,10 +392,13 @@ class MainScene extends Phaser.Scene {
 
     // 이동 트윈
     this.tweens.add({
-      targets: [this.player, this.playerNameText],
+      targets: [this.player, this.playerNameText, this.playerStatusText],
       x: targetX,
-      y: (target: Phaser.GameObjects.GameObject) =>
-        target === this.player ? targetY : targetY - TILE_SIZE,
+      y: (target: Phaser.GameObjects.GameObject) => {
+        if (target === this.player) return targetY
+        if (target === this.playerNameText) return targetY - TILE_SIZE
+        return targetY - TILE_SIZE + 14 // playerStatusText
+      },
       duration: 150,
       ease: 'Linear',
       onComplete: () => {
@@ -379,6 +425,7 @@ class MainScene extends Phaser.Scene {
     this.player.setPosition(x, y)
     this.player.setDepth(this.gridY)
     this.playerNameText.setPosition(x, y - TILE_SIZE)
+    this.playerStatusText.setPosition(x, y - TILE_SIZE + 14)
   }
 
   /**
@@ -399,7 +446,7 @@ class MainScene extends Phaser.Scene {
  * PhaserGame 컴포넌트
  */
 const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
-  const { remotePlayers, isConnected, myName, myEmailPrefix, myGridPos, onPositionChange } = props
+  const { remotePlayers, isConnected, myName, myEmailPrefix, myStatusMessage, myGridPos, onPositionChange } = props
 
   // 게임 인스턴스 ref
   const gameRef = useRef<Phaser.Game | null>(null)
@@ -479,8 +526,8 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
 
   // 내 정보 업데이트를 Phaser로 전달
   useEffect(() => {
-    EventBus.emit(GameEvents.MY_INFO_UPDATE, { name: myName, emailPrefix: myEmailPrefix, gridPos: myGridPos })
-  }, [myName, myEmailPrefix, myGridPos])
+    EventBus.emit(GameEvents.MY_INFO_UPDATE, { name: myName, emailPrefix: myEmailPrefix, statusMessage: myStatusMessage, gridPos: myGridPos })
+  }, [myName, myEmailPrefix, myStatusMessage, myGridPos])
 
   return (
     <div

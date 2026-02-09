@@ -11,10 +11,13 @@ interface Profile {
   email: string
   username: string
   department: string
+  position: string
   field: string
   project: string
+  projects: string[]
   tmi: string
   tech_stack: string[]
+  status_message: string
 }
 
 export default function DogamDetailPage() {
@@ -35,6 +38,15 @@ export default function DogamDetailPage() {
     }
     if (params.id) fetchProfile()
   }, [params.id])
+
+  // Resolve projects: prefer new array field, fall back to legacy single string
+  const resolvedProjects: string[] = profile
+    ? Array.isArray(profile.projects) && profile.projects.length > 0
+      ? profile.projects
+      : profile.project
+        ? [profile.project]
+        : []
+    : []
 
   if (loading) {
     return (
@@ -80,16 +92,33 @@ export default function DogamDetailPage() {
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
               ) : (
-                <div className="text-6xl">👤</div>
+                <div className="text-6xl">&#x1F464;</div>
               )}
             </div>
             <h1 className="text-2xl font-bold text-white">
               {profile.username || '이름 없음'}
             </h1>
-            <div className="flex gap-2 mt-2">
+
+            {/* Status Message */}
+            {profile.status_message && (
+              <div className="flex items-center gap-2 mt-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-gray-300 text-sm italic">
+                  {profile.status_message}
+                </span>
+              </div>
+            )}
+
+            {/* Badges: Department, Position, Field */}
+            <div className="flex gap-2 mt-3 flex-wrap justify-center">
               {profile.department && (
                 <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-sm">
                   {profile.department}
+                </span>
+              )}
+              {profile.position && (
+                <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-sm">
+                  {profile.position}
                 </span>
               )}
               {profile.field && (
@@ -102,11 +131,20 @@ export default function DogamDetailPage() {
 
           {/* Info Section */}
           <div className="p-6 space-y-6">
-            {/* Project */}
-            {profile.project && (
+            {/* Projects */}
+            {resolvedProjects.length > 0 && (
               <div>
-                <h3 className="text-gray-400 text-sm font-medium mb-1">현재 프로젝트</h3>
-                <p className="text-white">{profile.project}</p>
+                <h3 className="text-gray-400 text-sm font-medium mb-2">현재 프로젝트</h3>
+                <div className="flex flex-wrap gap-2">
+                  {resolvedProjects.map((proj, i) => (
+                    <span
+                      key={i}
+                      className="px-3 py-1 bg-cyan-500/20 text-cyan-300 rounded-lg text-sm"
+                    >
+                      {proj}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -138,7 +176,7 @@ export default function DogamDetailPage() {
             )}
 
             {/* No info yet */}
-            {!profile.tmi && (!profile.tech_stack || profile.tech_stack.length === 0) && !profile.project && (
+            {!profile.tmi && (!profile.tech_stack || profile.tech_stack.length === 0) && resolvedProjects.length === 0 && (
               <div className="text-center text-gray-500 py-8">
                 <p>아직 작성된 정보가 없습니다</p>
               </div>

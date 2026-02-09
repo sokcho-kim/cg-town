@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { getCharacterImageUrl, getEmailPrefix } from '@/lib/gameConfig'
 import Link from 'next/link'
@@ -14,11 +15,17 @@ interface Profile {
   project: string
   tmi: string
   tech_stack: string[]
+  is_npc: boolean
 }
 
+const TAB_ALL = '전체'
+const TAB_NPC = 'NPC'
+
 export default function DogamPage() {
+  const router = useRouter()
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<string>(TAB_ALL)
 
   useEffect(() => {
     async function fetchProfiles() {
@@ -29,6 +36,45 @@ export default function DogamPage() {
     }
     fetchProfiles()
   }, [])
+
+  // Split profiles into human and NPC groups
+  const humanProfiles = useMemo(
+    () => profiles.filter((p) => !p.is_npc),
+    [profiles]
+  )
+  const npcProfiles = useMemo(
+    () => profiles.filter((p) => p.is_npc),
+    [profiles]
+  )
+
+  // Extract unique departments from human profiles
+  const departments = useMemo(() => {
+    const depts = new Set<string>()
+    humanProfiles.forEach((p) => {
+      if (p.department) depts.add(p.department)
+    })
+    return Array.from(depts).sort()
+  }, [humanProfiles])
+
+  // Build ordered tab list: 전체, ...departments, NPC (if any)
+  const tabs = useMemo(() => {
+    const list = [TAB_ALL, ...departments]
+    if (npcProfiles.length > 0) list.push(TAB_NPC)
+    return list
+  }, [departments, npcProfiles])
+
+  // Filtered profiles based on active tab
+  const filteredProfiles = useMemo(() => {
+    if (activeTab === TAB_ALL) return humanProfiles
+    if (activeTab === TAB_NPC) return npcProfiles
+    return humanProfiles.filter((p) => p.department === activeTab)
+  }, [activeTab, humanProfiles, npcProfiles])
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/auth')
+  }
 
   if (loading) {
     return (
@@ -60,12 +106,37 @@ export default function DogamPage() {
             >
               게임으로 돌아가기
             </Link>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 transition text-sm"
+            >
+              로그아웃
+            </button>
+          </div>
+        </div>
+
+        {/* Department Tabs */}
+        <div className="mb-6 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 min-w-max pb-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+                  activeTab === tab
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-[#16213e] text-gray-300 hover:bg-[#1a2745] border border-gray-700'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Profile Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {profiles.map((profile) => (
+          {filteredProfiles.map((profile) => (
             <Link
               key={profile.id}
               href={`/dogam/${profile.id}`}
@@ -102,9 +173,15 @@ export default function DogamPage() {
           ))}
         </div>
 
-        {profiles.length === 0 && (
+        {filteredProfiles.length === 0 && (
           <div className="text-center text-gray-500 py-20">
-            <p className="text-lg">등록된 직원이 없습니다</p>
+            <p className="text-lg">
+              {activeTab === TAB_NPC
+                ? '등록된 NPC가 없습니다'
+                : activeTab === TAB_ALL
+                  ? '등록된 직원이 없습니다'
+                  : `${activeTab} 부서에 등록된 직원이 없습니다`}
+            </p>
           </div>
         )}
       </div>

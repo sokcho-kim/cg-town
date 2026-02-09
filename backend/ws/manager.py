@@ -91,6 +91,7 @@ class ConnectionManager:
             "type": "init",
             "your_position": spawn,
             "your_email_prefix": user_info.get("email_prefix", ""),
+            "your_status_message": user_info.get("status_message", ""),
             "players": {
                 uid: {
                     "position": self.positions[uid],

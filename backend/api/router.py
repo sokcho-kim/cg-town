@@ -16,6 +16,8 @@ class ProfileUpdate(BaseModel):
     project: str | None = None
     tmi: str | None = None
     tech_stack: list[str] | None = None
+    position: str | None = None
+    status_message: str | None = None
 
 
 # ===== 기존 엔드포인트 =====

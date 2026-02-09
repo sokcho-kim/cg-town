@@ -1,0 +1,5 @@
+username,email,department,position,is_npc
+조은빈,bin@ihopper.co.kr,디자인팀,사원,false
+김지민,jimin@ihopper.co.kr,개발팀,사원,false
+박선춘,psc@ihopper.co.kr,경영지원,대표,false
+CG봇,npc_cg@ihopper.co.kr,CG Town,NPC,true
