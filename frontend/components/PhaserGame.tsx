@@ -7,6 +7,8 @@ import { MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, getCharacter
 
 // 모바일 터치 D-pad 방향 (모듈 레벨 — Phaser update()에서 읽음)
 let mobileDirection: string | null = null
+// 채팅창 열림 여부 (true면 게임 입력 비활성화)
+let chatOpen = false
 
 // 원격 플레이어 타입 정의
 interface PlayerPosition {
@@ -21,6 +23,7 @@ interface PlayerInfo {
   email_prefix: string
   name: string
   status_message?: string
+  is_npc?: boolean
 }
 
 interface RemotePlayer {
@@ -52,8 +55,11 @@ class MainScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private player!: Phaser.GameObjects.Sprite
   private playerNameText!: Phaser.GameObjects.Text
-  private playerStatusText!: Phaser.GameObjects.Text
+  private playerBubbleGfx!: Phaser.GameObjects.Graphics
+  private playerBubbleText!: Phaser.GameObjects.Text
   private remotePlayerSprites: Map<string, Phaser.GameObjects.Container> = new Map()
+  // 원격 플레이어 정보 (텍스쳐 갱신용)
+  private remotePlayerInfo: Map<string, { emailPrefix: string; direction: string }> = new Map()
   private gridX: number = 12
   private gridY: number = 6
   private isMoving: boolean = false
@@ -63,6 +69,11 @@ class MainScene extends Phaser.Scene {
   private myStatusMessage: string = ''
   private loadedUsers: Set<string> = new Set()
   private isShutDown: boolean = false
+  // NPC 추적
+  private npcPositions: Map<string, { gridX: number; gridY: number; name: string; id: string; emailPrefix: string }> = new Map()
+  private nearbyNpcId: string | null = null
+  private npcHintText: Phaser.GameObjects.Text | null = null
+  private enterKey: Phaser.Input.Keyboard.Key | null = null
 
   constructor() {
     super({ key: 'MainScene' })
@@ -170,21 +181,19 @@ class MainScene extends Phaser.Scene {
     this.playerNameText.setOrigin(0.5, 1)
     this.playerNameText.setDepth(1000)
 
-    // 상태 메시지 텍스트
-    this.playerStatusText = this.add.text(
-      this.player.x,
-      this.player.y - TILE_SIZE * 1.5 + 14,
-      this.myStatusMessage,
-      {
-        fontSize: '11px',
-        color: '#fbbf24',
-        stroke: '#000000',
-        strokeThickness: 2,
-        align: 'center',
-      }
-    )
-    this.playerStatusText.setOrigin(0.5, 0)
-    this.playerStatusText.setDepth(1000)
+    // 상태 메시지 말풍선 (Graphics + Text — 같은 위치에 놓고 상대좌표로 그림)
+    const bubbleY = this.player.y - TILE_SIZE * 1.5 - 18
+    this.playerBubbleGfx = this.add.graphics()
+    this.playerBubbleGfx.setPosition(this.player.x, bubbleY)
+    this.playerBubbleGfx.setDepth(1001)
+    this.playerBubbleText = this.add.text(this.player.x, bubbleY, this.myStatusMessage, {
+      fontSize: '11px',
+      color: '#333333',
+      align: 'center',
+    })
+    this.playerBubbleText.setOrigin(0.5, 1)
+    this.playerBubbleText.setDepth(1002)
+    this.drawBubble(this.playerBubbleGfx, this.playerBubbleText)
 
     // 카메라 플레이어 추적 시작
     const cam = this.cameras.main
@@ -194,7 +203,31 @@ class MainScene extends Phaser.Scene {
     // 키보드 입력
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys()
+      this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER)
     }
+
+    // NPC 대화 힌트 텍스트 (숨김 상태)
+    this.npcHintText = this.add.text(0, 0, '대화하기 (Enter)', {
+      fontSize: '12px',
+      color: '#ffffff',
+      backgroundColor: '#E8852C',
+      padding: { x: 8, y: 4 },
+    })
+    this.npcHintText.setOrigin(0.5, 1)
+    this.npcHintText.setDepth(2000)
+    this.npcHintText.setVisible(false)
+
+    // 에셋 로드 완료 시 모든 스프라이트 텍스쳐 갱신
+    this.load.on('complete', () => {
+      this.refreshAllTextures()
+    })
+
+    // NPC 자율 이동 타이머 (3~5초 간격)
+    this.time.addEvent({
+      delay: 3000,
+      loop: true,
+      callback: () => this.wanderNpcs(),
+    })
 
     this.setupEventListeners()
 
@@ -207,6 +240,28 @@ class MainScene extends Phaser.Scene {
   private setupEventListeners() {
     EventBus.on(GameEvents.REMOTE_PLAYERS_UPDATE, this.handleRemotePlayersUpdate, this)
     EventBus.on(GameEvents.MY_INFO_UPDATE, this.handleMyInfoUpdate, this)
+    EventBus.on(GameEvents.CHAT_OPEN, (open: boolean) => { chatOpen = open })
+  }
+
+  /**
+   * 에셋 로드 완료 후 모든 스프라이트 텍스쳐 갱신
+   */
+  private refreshAllTextures() {
+    if (this.isShutDown) return
+    // 내 캐릭터
+    if (this.myEmailPrefix && this.player?.active) {
+      const key = this.getTextureKey(this.myEmailPrefix, this.direction)
+      this.player.setTexture(key)
+    }
+    // 원격 플레이어
+    this.remotePlayerSprites.forEach((container, userId) => {
+      const info = this.remotePlayerInfo.get(userId)
+      if (!info) return
+      const sprite = container.getAt(0) as Phaser.GameObjects.Sprite
+      if (sprite?.active) {
+        sprite.setTexture(this.getTextureKey(info.emailPrefix, info.direction))
+      }
+    })
   }
 
   private handleMyInfoUpdate = (data: { name: string; emailPrefix: string; statusMessage: string; gridPos: { x: number; y: number } | null }) => {
@@ -216,12 +271,6 @@ class MainScene extends Phaser.Scene {
     if (data.emailPrefix && data.emailPrefix !== this.myEmailPrefix) {
       this.myEmailPrefix = data.emailPrefix
       this.loadUserAssets(data.emailPrefix)
-      this.load.once('complete', () => {
-        if (this.player?.active) {
-          this.player.setTexture(this.getTextureKey(this.myEmailPrefix, this.direction))
-          this.player.setVisible(true)
-        }
-      })
       this.load.start()
     } else if (data.emailPrefix && this.player) {
       const key = this.getTextureKey(this.myEmailPrefix, this.direction)
@@ -235,8 +284,9 @@ class MainScene extends Phaser.Scene {
     }
 
     this.myStatusMessage = data.statusMessage || ''
-    if (this.playerStatusText?.active) {
-      this.playerStatusText.setText(this.myStatusMessage)
+    if (this.playerBubbleText?.active) {
+      this.playerBubbleText.setText(this.myStatusMessage)
+      this.drawBubble(this.playerBubbleGfx, this.playerBubbleText)
     }
 
     if (data.gridPos && !this.isMoving) {
@@ -249,12 +299,27 @@ class MainScene extends Phaser.Scene {
   private handleRemotePlayersUpdate = (players: Record<string, RemotePlayer>) => {
     if (this.isShutDown) return
 
+    // NPC 위치 추적 업데이트
+    this.npcPositions.clear()
+    Object.entries(players).forEach(([userId, p]) => {
+      if (p.user_info?.is_npc) {
+        this.npcPositions.set(userId, {
+          gridX: p.position.gridX,
+          gridY: p.position.gridY,
+          name: p.user_info.name,
+          id: p.user_info.id,
+          emailPrefix: p.user_info.email_prefix,
+        })
+      }
+    })
+
     const currentPlayerIds = new Set(Object.keys(players))
 
     this.remotePlayerSprites.forEach((container, userId) => {
       if (!currentPlayerIds.has(userId)) {
         container.destroy()
         this.remotePlayerSprites.delete(userId)
+        this.remotePlayerInfo.delete(userId)
       }
     })
 
@@ -269,15 +334,21 @@ class MainScene extends Phaser.Scene {
         this.load.start()
       }
 
+      // 플레이어 정보 저장 (텍스쳐 갱신용)
+      this.remotePlayerInfo.set(userId, { emailPrefix, direction: position.direction })
+
       const remoteStatusMsg = user_info?.status_message || ''
 
       if (this.remotePlayerSprites.has(userId)) {
         const container = this.remotePlayerSprites.get(userId)!
         const sprite = container.getAt(0) as Phaser.GameObjects.Sprite
 
-        const statusText = container.getAt(2) as Phaser.GameObjects.Text | undefined
-        if (statusText) {
-          statusText.setText(remoteStatusMsg)
+        // 말풍선 업데이트 (container children: [sprite, nameText, bubbleGfx, bubbleText])
+        const bubbleGfx = container.getAt(2) as Phaser.GameObjects.Graphics | undefined
+        const bubbleText = container.getAt(3) as Phaser.GameObjects.Text | undefined
+        if (bubbleText && bubbleGfx) {
+          bubbleText.setText(remoteStatusMsg)
+          this.drawBubble(bubbleGfx, bubbleText)
         }
 
         this.tweens.add({
@@ -310,20 +381,107 @@ class MainScene extends Phaser.Scene {
         })
         nameText.setOrigin(0.5, 1)
 
-        const statusText = this.add.text(0, -TILE_SIZE * 1.5 + 14, remoteStatusMsg, {
+        // 말풍선 (Graphics + Text — 같은 위치에 놓음)
+        const bY = -TILE_SIZE * 1.5 - 18
+        const bubbleGfx = this.add.graphics()
+        bubbleGfx.setPosition(0, bY)
+        const bubbleText = this.add.text(0, bY, remoteStatusMsg, {
           fontSize: '11px',
-          color: '#fbbf24',
-          stroke: '#000000',
-          strokeThickness: 2,
+          color: '#333333',
           align: 'center',
         })
-        statusText.setOrigin(0.5, 0)
+        bubbleText.setOrigin(0.5, 1)
+        this.drawBubble(bubbleGfx, bubbleText)
 
-        container.add([sprite, nameText, statusText])
+        container.add([sprite, nameText, bubbleGfx, bubbleText])
         container.setDepth(position.gridY)
 
         this.remotePlayerSprites.set(userId, container)
       }
+    })
+  }
+
+  /**
+   * 말풍선 그리기 — gfx와 text는 같은 위치에 놓고, 상대좌표(0,0 기준)로 그림
+   * 이렇게 하면 tween으로 둘을 같이 움직여도 말풍선이 정확히 따라옴
+   */
+  private drawBubble(gfx: Phaser.GameObjects.Graphics, text: Phaser.GameObjects.Text) {
+    gfx.clear()
+    if (!text.text) {
+      gfx.setVisible(false)
+      text.setVisible(false)
+      return
+    }
+    gfx.setVisible(true)
+    text.setVisible(true)
+
+    const pad = 6
+    const w = text.width + pad * 2
+    const h = text.height + pad * 2
+    // text origin (0.5, 1) → text는 자기 위치에서 위쪽으로 렌더됨
+    // gfx도 같은 위치이므로 (0,0) 기준 상대좌표 사용
+    const rx = -w / 2
+    const ry = -text.height - pad
+
+    gfx.fillStyle(0xffffff, 0.95)
+    gfx.lineStyle(1, 0xd1d5db, 1)
+    gfx.fillRoundedRect(rx, ry, w, h, 8)
+    gfx.strokeRoundedRect(rx, ry, w, h, 8)
+
+    // 꼬리 (아래 중앙)
+    const tailTop = ry + h
+    gfx.fillTriangle(-4, tailTop, 4, tailTop, 0, tailTop + 5)
+  }
+
+  /**
+   * NPC 자율 이동 — 랜덤 방향으로 1칸씩 이동
+   */
+  private wanderNpcs() {
+    if (this.isShutDown) return
+
+    const dirs = [
+      { dx: 0, dy: -1, dir: 'up' },
+      { dx: 0, dy: 1, dir: 'down' },
+      { dx: -1, dy: 0, dir: 'left' },
+      { dx: 1, dy: 0, dir: 'right' },
+    ]
+
+    this.npcPositions.forEach((npc, userId) => {
+      // 40% 확률로 이동
+      if (Math.random() > 0.4) return
+
+      const move = dirs[Math.floor(Math.random() * dirs.length)]
+      const newX = npc.gridX + move.dx
+      const newY = npc.gridY + move.dy
+
+      // 맵 범위 체크
+      if (newX < 0 || newX >= GRID_WIDTH || newY < 0 || newY >= GRID_HEIGHT) return
+
+      // 위치 업데이트
+      npc.gridX = newX
+      npc.gridY = newY
+
+      // 스프라이트 이동 애니메이션
+      const container = this.remotePlayerSprites.get(userId)
+      if (!container) return
+
+      const sprite = container.getAt(0) as Phaser.GameObjects.Sprite
+      sprite.setTexture(this.getTextureKey(npc.emailPrefix, move.dir))
+
+      // remotePlayerInfo도 업데이트
+      const info = this.remotePlayerInfo.get(userId)
+      if (info) info.direction = move.dir
+
+      this.tweens.add({
+        targets: container,
+        x: newX * TILE_SIZE + TILE_SIZE / 2,
+        y: newY * TILE_SIZE + TILE_SIZE / 2,
+        duration: 300,
+        ease: 'Linear',
+        onComplete: () => {
+          container.setDepth(newY)
+        }
+      })
     })
   }
 
@@ -363,7 +521,19 @@ class MainScene extends Phaser.Scene {
   }
 
   update() {
-    if (this.isMoving) return
+    // NPC 근접 감지 (항상 체크)
+    this.checkNpcProximity()
+
+    if (this.isMoving || chatOpen) return
+
+    // NPC 대화 트리거 (Enter 키)
+    if (this.enterKey?.isDown && this.nearbyNpcId) {
+      const npc = this.npcPositions.get(this.nearbyNpcId)
+      if (npc) {
+        EventBus.emit(GameEvents.NPC_INTERACT, { npcId: npc.id, npcName: npc.name })
+      }
+      return
+    }
 
     let newGridX = this.gridX
     let newGridY = this.gridY
@@ -400,44 +570,91 @@ class MainScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * NPC 근접 감지 — 1타일 이내이면 대화 힌트 표시
+   */
+  private checkNpcProximity() {
+    let foundNpcId: string | null = null
+    this.npcPositions.forEach((npc, userId) => {
+      if (foundNpcId) return
+      const dx = Math.abs(this.gridX - npc.gridX)
+      const dy = Math.abs(this.gridY - npc.gridY)
+      if (dx <= 1 && dy <= 1 && (dx + dy) <= 2) {
+        foundNpcId = userId
+      }
+    })
+
+    if (foundNpcId !== this.nearbyNpcId) {
+      this.nearbyNpcId = foundNpcId
+      if (foundNpcId && this.npcHintText) {
+        const npc = this.npcPositions.get(foundNpcId)!
+        const px = npc.gridX * TILE_SIZE + TILE_SIZE / 2
+        const py = npc.gridY * TILE_SIZE - TILE_SIZE * 0.8
+        this.npcHintText.setPosition(px, py)
+        this.npcHintText.setVisible(!chatOpen)
+        EventBus.emit('npc-nearby', { npcId: npc.id, npcName: npc.name })
+      } else {
+        if (this.npcHintText) this.npcHintText.setVisible(false)
+        EventBus.emit('npc-nearby', null)
+      }
+    }
+  }
+
   private movePlayer() {
     this.isMoving = true
     const targetX = this.gridX * TILE_SIZE + TILE_SIZE / 2
     const targetY = this.gridY * TILE_SIZE + TILE_SIZE / 2
+    const nameY = targetY - TILE_SIZE * 1.5
+    const bubbleY = nameY - 18
 
     this.player.setTexture(this.getTextureKey(this.myEmailPrefix, this.direction))
 
     this.tweens.add({
-      targets: [this.player, this.playerNameText, this.playerStatusText],
+      targets: this.player,
       x: targetX,
-      y: (target: Phaser.GameObjects.GameObject) => {
-        if (target === this.player) return targetY
-        if (target === this.playerNameText) return targetY - TILE_SIZE * 1.5
-        return targetY - TILE_SIZE * 1.5 + 14
-      },
+      y: targetY,
       duration: 150,
       ease: 'Linear',
-      onComplete: () => {
-        this.isMoving = false
-        this.player.setDepth(this.gridY)
+    })
+    this.tweens.add({
+      targets: this.playerNameText,
+      x: targetX,
+      y: nameY,
+      duration: 150,
+      ease: 'Linear',
+    })
+    this.tweens.add({
+      targets: [this.playerBubbleGfx, this.playerBubbleText],
+      x: targetX,
+      y: bubbleY,
+      duration: 150,
+      ease: 'Linear',
+    })
 
-        EventBus.emit(GameEvents.PLAYER_MOVE, {
-          gridX: this.gridX,
-          gridY: this.gridY,
-          direction: this.direction,
-        })
-      },
+    this.time.delayedCall(150, () => {
+      this.isMoving = false
+      this.player.setDepth(this.gridY)
+
+      EventBus.emit(GameEvents.PLAYER_MOVE, {
+        gridX: this.gridX,
+        gridY: this.gridY,
+        direction: this.direction,
+      })
     })
   }
 
   private updatePlayerPosition() {
     const x = this.gridX * TILE_SIZE + TILE_SIZE / 2
     const y = this.gridY * TILE_SIZE + TILE_SIZE / 2
+    const nameY = y - TILE_SIZE * 1.5
+    const bubbleY = nameY - 18
 
     this.player.setPosition(x, y)
     this.player.setDepth(this.gridY)
-    this.playerNameText.setPosition(x, y - TILE_SIZE * 1.5)
-    this.playerStatusText.setPosition(x, y - TILE_SIZE * 1.5 + 14)
+    this.playerNameText.setPosition(x, nameY)
+    this.playerBubbleGfx.setPosition(x, bubbleY)
+    this.playerBubbleText.setPosition(x, bubbleY)
+    this.drawBubble(this.playerBubbleGfx, this.playerBubbleText)
   }
 
   shutdown() {
@@ -446,9 +663,13 @@ class MainScene extends Phaser.Scene {
 
     EventBus.off(GameEvents.REMOTE_PLAYERS_UPDATE, this.handleRemotePlayersUpdate, this)
     EventBus.off(GameEvents.MY_INFO_UPDATE, this.handleMyInfoUpdate, this)
+    EventBus.off(GameEvents.CHAT_OPEN)
 
     this.remotePlayerSprites.forEach((container) => container.destroy())
     this.remotePlayerSprites.clear()
+    this.remotePlayerInfo.clear()
+    this.npcPositions.clear()
+    chatOpen = false
   }
 }
 
@@ -474,6 +695,7 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
   latestPropsRef.current = { myName, myEmailPrefix, myStatusMessage, myGridPos, remotePlayers }
 
   const [showDpad, setShowDpad] = useState(false)
+  const [nearbyNpc, setNearbyNpc] = useState<{ npcId: string; npcName: string } | null>(null)
 
   useImperativeHandle(ref, () => ({
     game: gameRef.current,
@@ -486,6 +708,15 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
+  }, [])
+
+  // NPC 근접 감지 (React 쪽)
+  useEffect(() => {
+    const handler = (data: { npcId: string; npcName: string } | null) => {
+      setNearbyNpc(data)
+    }
+    EventBus.on('npc-nearby', handler)
+    return () => { EventBus.off('npc-nearby', handler) }
   }, [])
 
   // Phaser 게임 인스턴스 생성
@@ -661,6 +892,32 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
           </button>
           <div />
         </div>
+      )}
+
+      {/* 모바일 NPC 대화 버튼 */}
+      {showDpad && nearbyNpc && (
+        <button
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 200,
+            padding: '12px 20px',
+            borderRadius: 16,
+            border: 'none',
+            backgroundColor: '#E8852C',
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: 'bold',
+            touchAction: 'none',
+            cursor: 'pointer',
+          }}
+          onClick={() => {
+            EventBus.emit(GameEvents.NPC_INTERACT, { npcId: nearbyNpc.npcId, npcName: nearbyNpc.npcName })
+          }}
+        >
+          {nearbyNpc.npcName}에게 대화하기
+        </button>
       )}
     </>
   )

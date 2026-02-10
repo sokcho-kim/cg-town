@@ -24,3 +24,8 @@ const IMG_VERSION = '20260210g'
 export function getCharacterImageUrl(emailPrefix: string, direction: string): string {
   return `${SUPABASE_URL}/storage/v1/object/public/characters/${emailPrefix}/${direction}.png?v=${IMG_VERSION}`
 }
+
+// NPC 고정 위치 (gridX, gridY)
+export const NPC_POSITIONS: Record<string, { x: number; y: number }> = {
+  'npc_hop-ei': { x: 18, y: 3 },
+}

@@ -22,4 +22,8 @@ export const GameEvents = {
   PLAYER_MOVE: 'player-move',                         // 플레이어 이동 시
   SCENE_READY: 'scene-ready',                         // 씬 준비 완료
   GAME_READY: 'game-ready',                           // 게임 인스턴스 준비 완료
+  NPC_INTERACT: 'npc-interact',                       // NPC 대화 시작 요청
+
+  // React -> Phaser
+  CHAT_OPEN: 'chat-open',                             // 채팅창 열림/닫힘
 } as const
