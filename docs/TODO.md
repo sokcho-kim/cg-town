@@ -31,7 +31,7 @@
 | 4 | ~~관리자 일괄 등록 스크립트~~ | 지민 | DONE | `scripts/bulk-register.js` |
 | 4b | ~~CSV 작성 + 일괄 등록 실행~~ | 지민 | DONE | 28명 등록 완료, 아바타 동물 상태메시지 부여 |
 | 4c | ~~캐릭터 이미지 Storage 업로드~~ | 지민 | DONE | Gemini 이미지 분류/리사이즈(128x256) → Supabase Storage 업로드 |
-| 4d | 캐릭터 비율 수정 | 지민 | TODO | 게임 내 캐릭터 표시 비율(TILE_SIZE x TILE_SIZE*1.5 = 64x96) 확인 필요, 찌그러짐 이슈 |
+| 4d | ~~캐릭터 비율 수정~~ | 지민 | DONE | 128×256 → 64×128 (1:2 비율 유지), 텍스트 오프셋 조정 완료 |
 | 5 | ~~캐릭터 머리 위 상태 텍스트~~ | 지민 | DONE | `status_message` 컬럼 + Phaser 표시 |
 
 ---

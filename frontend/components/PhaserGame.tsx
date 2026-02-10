@@ -167,14 +167,14 @@ class MainScene extends Phaser.Scene {
       this.gridY * TILE_SIZE + TILE_SIZE / 2,
       initialTexture
     )
-    this.player.setDisplaySize(TILE_SIZE, TILE_SIZE * 1.5)
+    this.player.setDisplaySize(TILE_SIZE, TILE_SIZE * 2)
     this.player.setOrigin(0.5, 0.75)
     this.player.setDepth(this.gridY)
 
     // 플레이어 이름 텍스트
     this.playerNameText = this.add.text(
       this.player.x,
-      this.player.y - TILE_SIZE,
+      this.player.y - TILE_SIZE * 1.5,
       this.myName,
       {
         fontSize: '14px',
@@ -190,7 +190,7 @@ class MainScene extends Phaser.Scene {
     // 플레이어 상태 메시지 텍스트 (이름 아래에 표시)
     this.playerStatusText = this.add.text(
       this.player.x,
-      this.player.y - TILE_SIZE + 14,
+      this.player.y - TILE_SIZE * 1.5 + 14,
       this.myStatusMessage,
       {
         fontSize: '11px',
@@ -342,10 +342,10 @@ class MainScene extends Phaser.Scene {
 
         const textureKey = this.getTextureKey(emailPrefix, position.direction)
         const sprite = this.add.sprite(0, 0, textureKey)
-        sprite.setDisplaySize(TILE_SIZE, TILE_SIZE * 1.5)
+        sprite.setDisplaySize(TILE_SIZE, TILE_SIZE * 2)
         sprite.setOrigin(0.5, 0.75)
 
-        const nameText = this.add.text(0, -TILE_SIZE, user_info.name, {
+        const nameText = this.add.text(0, -TILE_SIZE * 1.5, user_info.name, {
           fontSize: '14px',
           color: '#ffffff',
           stroke: '#000000',
@@ -354,7 +354,7 @@ class MainScene extends Phaser.Scene {
         })
         nameText.setOrigin(0.5, 1)
 
-        const statusText = this.add.text(0, -TILE_SIZE + 14, remoteStatusMsg, {
+        const statusText = this.add.text(0, -TILE_SIZE * 1.5 + 14, remoteStatusMsg, {
           fontSize: '11px',
           color: '#fbbf24',
           stroke: '#000000',
@@ -452,8 +452,8 @@ class MainScene extends Phaser.Scene {
       x: targetX,
       y: (target: Phaser.GameObjects.GameObject) => {
         if (target === this.player) return targetY
-        if (target === this.playerNameText) return targetY - TILE_SIZE
-        return targetY - TILE_SIZE + 14 // playerStatusText
+        if (target === this.playerNameText) return targetY - TILE_SIZE * 1.5
+        return targetY - TILE_SIZE * 1.5 + 14 // playerStatusText
       },
       duration: 150,
       ease: 'Linear',
@@ -480,8 +480,8 @@ class MainScene extends Phaser.Scene {
 
     this.player.setPosition(x, y)
     this.player.setDepth(this.gridY)
-    this.playerNameText.setPosition(x, y - TILE_SIZE)
-    this.playerStatusText.setPosition(x, y - TILE_SIZE + 14)
+    this.playerNameText.setPosition(x, y - TILE_SIZE * 1.5)
+    this.playerStatusText.setPosition(x, y - TILE_SIZE * 1.5 + 14)
   }
 
   /**

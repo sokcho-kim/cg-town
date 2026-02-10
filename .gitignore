@@ -36,3 +36,7 @@ notebooks/.ipynb_checkpoints/
 # ===== 기타 =====
 *.local
 .turbo
+
+# ===== 레거시 =====
+backend/data/faiss_index/
+backend/knowledge_base/
