@@ -89,6 +89,9 @@ class MainScene extends Phaser.Scene {
     this.load.image('trees', '/images/sprout-lands/objects/Trees_stumps_bushes.png')
     this.load.image('grass_biom', '/images/sprout-lands/objects/Basic_Grass_Biom_things.png')
     this.load.image('mushrooms_flowers', '/images/sprout-lands/objects/Mushrooms_Flowers_Stones.png')
+    this.load.image('farm_tileset', '/images/sprout-lands/tilesets/free_sample_tileset.png')
+    this.load.image('coastal_furniture', '/images/sprout-lands/objects/coastal_furnitureset_withshadow.png')
+    this.load.image('office', '/images/office/office_tileset.png')
 
     // __DEFAULT 플레이스홀더 (1x1 투명 픽셀) — 에셋 로드 전 빈 텍스처 방지
     if (!this.textures.exists('__DEFAULT')) {
@@ -134,31 +137,32 @@ class MainScene extends Phaser.Scene {
     const treesTileset = map.addTilesetImage('trees', 'trees')
     const grassBiomTileset = map.addTilesetImage('grass_biom', 'grass_biom')
     const mushroomsTileset = map.addTilesetImage('mushrooms_flowers', 'mushrooms_flowers')
+    const farmTileset = map.addTilesetImage('farm_tileset', 'farm_tileset')
+    const coastalTileset = map.addTilesetImage('coastal_furniture', 'coastal_furniture')
+    const officeTileset = map.addTilesetImage('office', 'office')
 
     // 모든 타일셋 배열 (각 레이어에서 필요한 타일셋을 참조)
     const allTilesets = [
       grassTileset, waterTileset, stonePathTileset, fencesTileset,
-      hillsTileset, treesTileset, grassBiomTileset, mushroomsTileset
+      hillsTileset, treesTileset, grassBiomTileset, mushroomsTileset, farmTileset, coastalTileset, officeTileset
     ].filter((ts): ts is Phaser.Tilemaps.Tileset => ts !== null)
 
     // 레이어 생성 (바닥부터 위로 쌓기, 모두 배경 깊이)
     const groundLayer = map.createLayer('ground', allTilesets, 0, 0)
     groundLayer?.setDepth(-10)
 
-    const waterLayer = map.createLayer('water', allTilesets, 0, 0)
-    waterLayer?.setDepth(-9)
+    const officeChairLayer = map.createLayer('office chair', allTilesets, 0, 0)
+    officeChairLayer?.setDepth(-9)
 
-    const pathsLayer = map.createLayer('paths', allTilesets, 0, 0)
-    pathsLayer?.setDepth(-8)
+    const decoLayer = map.createLayer('deco', allTilesets, 0, 0)
+    decoLayer?.setDepth(-8)
 
-    const fencesLayer = map.createLayer('fences', allTilesets, 0, 0)
-    fencesLayer?.setDepth(-7)
+    const deco2Layer = map.createLayer('deco 2', allTilesets, 0, 0)
+    deco2Layer?.setDepth(-7)
 
-    const decorationsLayer = map.createLayer('decorations', allTilesets, 0, 0)
-    decorationsLayer?.setDepth(-6)
-
-    // 카메라 설정 (맵 경계 설정)
-    this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT)
+    // 카메라 설정: 맵 전체가 브라우저에 보이도록 zoom + 위치 고정
+    this.updateCameraFit()
+    this.scale.on('resize', () => this.updateCameraFit())
 
     // 플레이어 스프라이트 생성 (기본 캐릭터로 시작, MY_INFO_UPDATE에서 커스텀으로 교체)
     const initialTexture = this.textures.exists('default_front') ? 'default_front' : '__DEFAULT'
@@ -203,8 +207,7 @@ class MainScene extends Phaser.Scene {
     this.playerStatusText.setOrigin(0.5, 0)
     this.playerStatusText.setDepth(1000)
 
-    // 카메라가 플레이어를 따라가도록 설정
-    this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
+    // 카메라 고정 (맵 전체 보기 모드이므로 플레이어 따라가지 않음)
 
     // 키보드 입력 설정
     if (this.input.keyboard) {
@@ -214,7 +217,7 @@ class MainScene extends Phaser.Scene {
     // EventBus 이벤트 리스너 등록
     this.setupEventListeners()
 
-    // 씬 파괴 시 정리 (React Strict Mode에서 game.destroy() 호출 시 실행)
+    // 씬 종료 시 EventBus 리스너 정리
     this.events.on('shutdown', this.shutdown, this)
     this.events.on('destroy', this.shutdown, this)
 
@@ -237,19 +240,19 @@ class MainScene extends Phaser.Scene {
    * 내 정보 업데이트 핸들러
    */
   private handleMyInfoUpdate = (data: { name: string; emailPrefix: string; statusMessage: string; gridPos: { x: number; y: number } | null }) => {
-    // 씬이 파괴된 상태면 무시 (React Strict Mode 대응)
-    if (this.isShutDown) return
+    // 씬이 파괴된 경우 무시
+    if (!this.sys || !this.scene || this.isShutDown) return
 
-    this.myName = data.name
+    this.myName = data.name || ''
     if (data.emailPrefix && data.emailPrefix !== this.myEmailPrefix) {
       this.myEmailPrefix = data.emailPrefix
       // 내 캐릭터 에셋 동적 로드
       this.loadUserAssets(data.emailPrefix)
       this.load.once('complete', () => {
-        if (this.isShutDown || !this.player) return
-        const key = this.getTextureKey(this.myEmailPrefix, this.direction)
-        this.player.setTexture(key)
-        this.player.setVisible(true)
+        if (this.player?.active) {
+          this.player.setTexture(this.getTextureKey(this.myEmailPrefix, this.direction))
+          this.player.setVisible(true)
+        }
       })
       this.load.start()
     } else if (data.emailPrefix && this.player) {
@@ -260,13 +263,13 @@ class MainScene extends Phaser.Scene {
         this.player.setVisible(true)
       }
     }
-    if (this.playerNameText) {
-      this.playerNameText.setText(data.name)
+    if (this.playerNameText?.active) {
+      this.playerNameText.setText(this.myName)
     }
 
     // 상태 메시지 업데이트
     this.myStatusMessage = data.statusMessage || ''
-    if (this.playerStatusText) {
+    if (this.playerStatusText?.active) {
       this.playerStatusText.setText(this.myStatusMessage)
     }
 
@@ -398,6 +401,29 @@ class MainScene extends Phaser.Scene {
       return fallbackKey
     }
     return '__DEFAULT'
+  }
+
+  /**
+   * 카메라를 브라우저 크기에 맞춰 맵 전체가 보이도록 zoom + 위치 설정
+   * - 맵 Top edge가 브라우저 상단에 붙도록 고정
+   * - 수평은 중앙 정렬
+   */
+  private updateCameraFit() {
+    const cam = this.cameras.main
+    const zoomX = cam.width / MAP_WIDTH
+    const zoomY = cam.height / MAP_HEIGHT
+    const zoom = Math.min(zoomX, zoomY)
+    cam.setZoom(zoom)
+
+    // 줌 적용 후 월드 좌표 기준 보이는 영역 크기
+    const visibleW = cam.width / zoom
+    const visibleH = cam.height / zoom
+
+    // 수평 중앙, 수직은 맵 Top이 뷰포트 상단에 붙도록
+    cam.scrollX = (MAP_WIDTH - visibleW) / 2
+    cam.scrollY = 0
+
+    cam.removeBounds()
   }
 
   update() {
