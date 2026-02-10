@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -18,6 +18,14 @@ interface Profile {
 }
 
 export default function DogamEditPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center"><p className="text-gray-900 text-lg">Loading...</p></div>}>
+      <DogamEditContent />
+    </Suspense>
+  )
+}
+
+function DogamEditContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const targetId = searchParams.get('id') // 관리자가 다른 유저 편집 시
