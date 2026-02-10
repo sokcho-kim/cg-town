@@ -40,3 +40,6 @@ notebooks/.ipynb_checkpoints/
 # ===== 레거시 =====
 backend/data/faiss_index/
 backend/knowledge_base/
+
+# 아바타 정규화 백업
+scripts/avatars_backup/
