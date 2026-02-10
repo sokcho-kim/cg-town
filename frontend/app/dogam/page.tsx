@@ -11,6 +11,7 @@ interface Profile {
   email: string
   username: string
   department: string
+  position: string
   field: string
   project: string
   tmi: string
@@ -20,6 +21,33 @@ interface Profile {
 
 const TAB_ALL = '전체'
 const TAB_NPC = 'NPC'
+
+// 부서 순서 (탭 + 정렬용)
+const DEPT_ORDER = ['경영', '기획', '연구소', 'AI', '서비스개발']
+
+// 직급 순서 (높은 직급이 먼저)
+const POSITION_ORDER = ['CEO', 'CTO', '이사', '소장', '부소장', '팀장', '대리', '연구원', '사원']
+
+function sortProfiles(profiles: Profile[]): Profile[] {
+  return [...profiles].sort((a, b) => {
+    // 1. 부서 순서
+    const deptA = DEPT_ORDER.indexOf(a.department)
+    const deptB = DEPT_ORDER.indexOf(b.department)
+    const dA = deptA === -1 ? 999 : deptA
+    const dB = deptB === -1 ? 999 : deptB
+    if (dA !== dB) return dA - dB
+
+    // 2. 직급 순서
+    const posA = POSITION_ORDER.indexOf(a.position)
+    const posB = POSITION_ORDER.indexOf(b.position)
+    const pA = posA === -1 ? 999 : posA
+    const pB = posB === -1 ? 999 : posB
+    if (pA !== pB) return pA - pB
+
+    // 3. 이름 가나다순
+    return (a.username || '').localeCompare(b.username || '', 'ko')
+  })
+}
 
 export default function DogamPage() {
   const router = useRouter()
@@ -47,13 +75,10 @@ export default function DogamPage() {
     [profiles]
   )
 
-  // Extract unique departments from human profiles
+  // Extract unique departments from human profiles (고정 순서)
   const departments = useMemo(() => {
-    const depts = new Set<string>()
-    humanProfiles.forEach((p) => {
-      if (p.department) depts.add(p.department)
-    })
-    return Array.from(depts).sort()
+    const existing = new Set(humanProfiles.map((p) => p.department).filter(Boolean))
+    return DEPT_ORDER.filter((d) => existing.has(d))
   }, [humanProfiles])
 
   // Build ordered tab list: 전체, ...departments, NPC (if any)
@@ -63,11 +88,11 @@ export default function DogamPage() {
     return list
   }, [departments, npcProfiles])
 
-  // Filtered profiles based on active tab
+  // Filtered + sorted profiles based on active tab
   const filteredProfiles = useMemo(() => {
-    if (activeTab === TAB_ALL) return humanProfiles
+    if (activeTab === TAB_ALL) return sortProfiles(humanProfiles)
     if (activeTab === TAB_NPC) return npcProfiles
-    return humanProfiles.filter((p) => p.department === activeTab)
+    return sortProfiles(humanProfiles.filter((p) => p.department === activeTab))
   }, [activeTab, humanProfiles, npcProfiles])
 
   const handleLogout = async () => {
@@ -143,17 +168,17 @@ export default function DogamPage() {
               className="group bg-[#16213e] rounded-xl p-4 hover:bg-[#1a2745] transition border border-gray-800 hover:border-indigo-500/50"
             >
               {/* Character Image */}
-              <div className="aspect-square bg-[#0f3460]/30 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+              <div className="aspect-[3/4] bg-[#0f3460]/30 rounded-lg mb-3 relative overflow-hidden">
                 {profile.email ? (
                   <img
                     src={getCharacterImageUrl(getEmailPrefix(profile.email), 'front')}
                     alt={profile.username}
-                    className="w-3/4 h-3/4 object-contain"
+                    className="absolute inset-0 w-full h-full object-contain object-bottom"
                     style={{ imageRendering: 'pixelated' }}
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                 ) : (
-                  <div className="text-4xl">👤</div>
+                  <div className="absolute inset-0 flex items-center justify-center text-4xl">👤</div>
                 )}
               </div>
 

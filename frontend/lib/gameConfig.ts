@@ -18,6 +18,9 @@ export function getEmailPrefix(email: string): string {
   return email.split('@')[0] || ''
 }
 
+// 이미지 정규화 후 CDN 캐시 무효화용 버전
+const IMG_VERSION = '20260210c'
+
 export function getCharacterImageUrl(emailPrefix: string, direction: string): string {
-  return `${SUPABASE_URL}/storage/v1/object/public/characters/${emailPrefix}/${direction}.png`
+  return `${SUPABASE_URL}/storage/v1/object/public/characters/${emailPrefix}/${direction}.png?v=${IMG_VERSION}`
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -19,6 +19,8 @@ interface Profile {
 
 export default function DogamEditPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const targetId = searchParams.get('id') // 관리자가 다른 유저 편집 시
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -33,7 +35,7 @@ export default function DogamEditPage() {
   const [statusMessage, setStatusMessage] = useState('')
 
   useEffect(() => {
-    async function fetchMyProfile() {
+    async function fetchProfile() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -41,16 +43,28 @@ export default function DogamEditPage() {
         return
       }
 
+      // 관리자가 다른 유저 편집하는 경우
+      let profileId = user.id
+      if (targetId) {
+        const { data: me } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single()
+        if (me?.is_admin) {
+          profileId = targetId
+        }
+      }
+
       const { data } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('id', profileId)
         .single()
 
       if (data) {
         setProfile(data)
         setField(data.field || '')
-        // Support legacy single-string project field and new array projects field
         if (Array.isArray(data.projects)) {
           setProjects(data.projects)
         } else if (data.project && typeof data.project === 'string') {
@@ -64,8 +78,8 @@ export default function DogamEditPage() {
       }
       setLoading(false)
     }
-    fetchMyProfile()
-  }, [router])
+    fetchProfile()
+  }, [router, targetId])
 
   const handleSave = async () => {
     if (!profile) return
