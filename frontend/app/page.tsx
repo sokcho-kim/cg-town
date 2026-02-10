@@ -55,22 +55,26 @@ export default function Home() {
       <div
         style={{
           position: 'fixed',
-          top: 10,
-          right: 10,
+          top: 6,
+          right: 6,
           zIndex: 100,
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: '4px',
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end',
+          maxWidth: 'calc(100vw - 12px)',
         }}
       >
         {/* 연결 상태 표시 */}
         <div
           style={{
-            padding: '4px 12px',
-            borderRadius: '12px',
-            fontSize: '12px',
+            padding: '3px 8px',
+            borderRadius: '10px',
+            fontSize: '11px',
             backgroundColor: isConnected ? 'rgba(34,197,94,0.8)' : 'rgba(239,68,68,0.8)',
             color: 'white',
+            whiteSpace: 'nowrap',
           }}
         >
           {isConnected ? `온라인 (${Object.keys(remotePlayers).length + 1}명)` : '연결 중...'}
@@ -80,9 +84,9 @@ export default function Home() {
         <button
           onClick={() => router.push('/dogam')}
           style={{
-            padding: '4px 10px',
-            borderRadius: '12px',
-            fontSize: '12px',
+            padding: '3px 8px',
+            borderRadius: '10px',
+            fontSize: '11px',
             backgroundColor: 'rgba(59,130,246,0.8)',
             color: 'white',
             border: 'none',
@@ -99,9 +103,9 @@ export default function Home() {
         <button
           onClick={handleLogout}
           style={{
-            padding: '4px 10px',
-            borderRadius: '12px',
-            fontSize: '12px',
+            padding: '3px 8px',
+            borderRadius: '10px',
+            fontSize: '11px',
             backgroundColor: 'rgba(220,38,38,0.8)',
             color: 'white',
             border: 'none',

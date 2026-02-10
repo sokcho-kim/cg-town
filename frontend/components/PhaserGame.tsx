@@ -1,19 +1,12 @@
 'use client'
 
-import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react'
 import * as Phaser from 'phaser'
 import { EventBus, GameEvents } from '@/lib/EventBus'
 import { MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, getCharacterImageUrl } from '@/lib/gameConfig'
 
-/**
- * PhaserGame 컴포넌트
- *
- * React와 Phaser를 연결하는 브릿지 컴포넌트입니다.
- * - useEffect에서 Phaser 게임 인스턴스를 생성합니다.
- * - useRef로 게임 인스턴스를 관리합니다.
- * - cleanup에서 game.destroy(true)로 리소스를 정리합니다.
- * - EventBus를 통해 React와 Phaser 간 통신을 합니다.
- */
+// 모바일 터치 D-pad 방향 (모듈 레벨 — Phaser update()에서 읽음)
+let mobileDirection: string | null = null
 
 // 원격 플레이어 타입 정의
 interface PlayerPosition {
@@ -54,7 +47,6 @@ export interface PhaserGameRef {
 
 /**
  * 메인 게임 씬
- * 맵, 캐릭터, 입력 처리를 담당합니다.
  */
 class MainScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
@@ -77,10 +69,8 @@ class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    // 타일맵 JSON 로드
     this.load.tilemapTiledJSON('tilemap', '/maps/main.json')
 
-    // Sprout Lands 타일셋 이미지 로드
     this.load.image('grass', '/images/sprout-lands/tilesets/Grass.png')
     this.load.image('water', '/images/sprout-lands/tilesets/Water.png')
     this.load.image('stone_path', '/images/sprout-lands/tilesets/Stone_Path.png')
@@ -93,7 +83,6 @@ class MainScene extends Phaser.Scene {
     this.load.image('coastal_furniture', '/images/sprout-lands/objects/coastal_furnitureset_withshadow.png')
     this.load.image('office', '/images/office/office_tileset.png')
 
-    // __DEFAULT 플레이스홀더 (1x1 투명 픽셀) — 에셋 로드 전 빈 텍스처 방지
     if (!this.textures.exists('__DEFAULT')) {
       const canvas = document.createElement('canvas')
       canvas.width = 1
@@ -101,14 +90,9 @@ class MainScene extends Phaser.Scene {
       this.textures.addCanvas('__DEFAULT', canvas)
     }
 
-    // 기본 캐릭터 에셋 로드 (커스텀 이미지가 없는 유저용 폴백)
     this.loadUserAssets('default')
   }
 
-  /**
-   * 유저 캐릭터 에셋 로드 (Supabase Storage URL 기반)
-   * username으로 URL을 조합: ${SUPABASE_URL}/storage/v1/object/public/characters/${username}/${direction}.png
-   */
   private loadUserAssets(username: string) {
     if (!username || this.loadedUsers.has(username)) return
     this.loadedUsers.add(username)
@@ -116,7 +100,6 @@ class MainScene extends Phaser.Scene {
     const directions = ['front', 'back', 'left', 'right', 'default']
     directions.forEach((dir) => {
       const key = `${username}_${dir}`
-      // 기본 캐릭터는 로컬 파일, 나머지는 Supabase Storage
       const url = username === 'default'
         ? `/images/characters/default/${dir}.png`
         : getCharacterImageUrl(username, dir)
@@ -125,10 +108,8 @@ class MainScene extends Phaser.Scene {
   }
 
   create() {
-    // 타일맵 생성
     const map = this.make.tilemap({ key: 'tilemap' })
 
-    // Sprout Lands 타일셋 이미지 연결
     const grassTileset = map.addTilesetImage('grass', 'grass')
     const waterTileset = map.addTilesetImage('water', 'water')
     const stonePathTileset = map.addTilesetImage('stone_path', 'stone_path')
@@ -141,13 +122,11 @@ class MainScene extends Phaser.Scene {
     const coastalTileset = map.addTilesetImage('coastal_furniture', 'coastal_furniture')
     const officeTileset = map.addTilesetImage('office', 'office')
 
-    // 모든 타일셋 배열 (각 레이어에서 필요한 타일셋을 참조)
     const allTilesets = [
       grassTileset, waterTileset, stonePathTileset, fencesTileset,
       hillsTileset, treesTileset, grassBiomTileset, mushroomsTileset, farmTileset, coastalTileset, officeTileset
     ].filter((ts): ts is Phaser.Tilemaps.Tileset => ts !== null)
 
-    // 레이어 생성 (바닥부터 위로 쌓기, 모두 배경 깊이)
     const groundLayer = map.createLayer('ground', allTilesets, 0, 0)
     groundLayer?.setDepth(-10)
 
@@ -160,11 +139,11 @@ class MainScene extends Phaser.Scene {
     const deco2Layer = map.createLayer('deco 2', allTilesets, 0, 0)
     deco2Layer?.setDepth(-7)
 
-    // 카메라 설정: 맵 전체가 브라우저에 보이도록 zoom + 위치 고정
+    // 카메라: 플레이어 추적 + 적응형 줌
     this.updateCameraFit()
     this.scale.on('resize', () => this.updateCameraFit())
 
-    // 플레이어 스프라이트 생성 (기본 캐릭터로 시작, MY_INFO_UPDATE에서 커스텀으로 교체)
+    // 플레이어 스프라이트
     const initialTexture = this.textures.exists('default_front') ? 'default_front' : '__DEFAULT'
     this.player = this.add.sprite(
       this.gridX * TILE_SIZE + TILE_SIZE / 2,
@@ -175,7 +154,7 @@ class MainScene extends Phaser.Scene {
     this.player.setOrigin(0.5, 0.75)
     this.player.setDepth(this.gridY)
 
-    // 플레이어 이름 텍스트
+    // 이름 텍스트
     this.playerNameText = this.add.text(
       this.player.x,
       this.player.y - TILE_SIZE * 1.5,
@@ -191,7 +170,7 @@ class MainScene extends Phaser.Scene {
     this.playerNameText.setOrigin(0.5, 1)
     this.playerNameText.setDepth(1000)
 
-    // 플레이어 상태 메시지 텍스트 (이름 아래에 표시)
+    // 상태 메시지 텍스트
     this.playerStatusText = this.add.text(
       this.player.x,
       this.player.y - TILE_SIZE * 1.5 + 14,
@@ -207,46 +186,35 @@ class MainScene extends Phaser.Scene {
     this.playerStatusText.setOrigin(0.5, 0)
     this.playerStatusText.setDepth(1000)
 
-    // 카메라 고정 (맵 전체 보기 모드이므로 플레이어 따라가지 않음)
+    // 카메라 플레이어 추적 시작
+    const cam = this.cameras.main
+    cam.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT)
+    cam.startFollow(this.player, true, 0.1, 0.1)
 
-    // 키보드 입력 설정
+    // 키보드 입력
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys()
     }
 
-    // EventBus 이벤트 리스너 등록
     this.setupEventListeners()
 
-    // 씬 종료 시 EventBus 리스너 정리
     this.events.on('shutdown', this.shutdown, this)
     this.events.on('destroy', this.shutdown, this)
 
-    // 씬 준비 완료 이벤트 발생
     EventBus.emit(GameEvents.SCENE_READY, this)
   }
 
-  /**
-   * EventBus 이벤트 리스너 설정
-   */
   private setupEventListeners() {
-    // 원격 플레이어 업데이트
     EventBus.on(GameEvents.REMOTE_PLAYERS_UPDATE, this.handleRemotePlayersUpdate, this)
-
-    // 내 정보 업데이트
     EventBus.on(GameEvents.MY_INFO_UPDATE, this.handleMyInfoUpdate, this)
   }
 
-  /**
-   * 내 정보 업데이트 핸들러
-   */
   private handleMyInfoUpdate = (data: { name: string; emailPrefix: string; statusMessage: string; gridPos: { x: number; y: number } | null }) => {
-    // 씬이 파괴된 경우 무시
     if (!this.sys || !this.scene || this.isShutDown) return
 
     this.myName = data.name || ''
     if (data.emailPrefix && data.emailPrefix !== this.myEmailPrefix) {
       this.myEmailPrefix = data.emailPrefix
-      // 내 캐릭터 에셋 동적 로드
       this.loadUserAssets(data.emailPrefix)
       this.load.once('complete', () => {
         if (this.player?.active) {
@@ -256,7 +224,6 @@ class MainScene extends Phaser.Scene {
       })
       this.load.start()
     } else if (data.emailPrefix && this.player) {
-      // 이미 로드된 에셋이면 바로 적용
       const key = this.getTextureKey(this.myEmailPrefix, this.direction)
       if (this.textures.exists(key)) {
         this.player.setTexture(key)
@@ -267,13 +234,11 @@ class MainScene extends Phaser.Scene {
       this.playerNameText.setText(this.myName)
     }
 
-    // 상태 메시지 업데이트
     this.myStatusMessage = data.statusMessage || ''
     if (this.playerStatusText?.active) {
       this.playerStatusText.setText(this.myStatusMessage)
     }
 
-    // 초기 위치 설정
     if (data.gridPos && !this.isMoving) {
       this.gridX = data.gridPos.x
       this.gridY = data.gridPos.y
@@ -281,16 +246,11 @@ class MainScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * 원격 플레이어 업데이트 핸들러
-   */
   private handleRemotePlayersUpdate = (players: Record<string, RemotePlayer>) => {
-    // 씬이 파괴된 상태면 무시 (React Strict Mode 대응)
     if (this.isShutDown) return
 
     const currentPlayerIds = new Set(Object.keys(players))
 
-    // 제거된 플레이어 삭제
     this.remotePlayerSprites.forEach((container, userId) => {
       if (!currentPlayerIds.has(userId)) {
         container.destroy()
@@ -298,14 +258,12 @@ class MainScene extends Phaser.Scene {
       }
     })
 
-    // 플레이어 추가/업데이트
     Object.entries(players).forEach(([userId, playerData]) => {
       const { position, user_info } = playerData
       const emailPrefix = user_info?.email_prefix || ''
       const targetX = position.gridX * TILE_SIZE + TILE_SIZE / 2
       const targetY = position.gridY * TILE_SIZE + TILE_SIZE / 2
 
-      // 해당 유저 에셋이 아직 로드되지 않았으면 동적 로드
       if (emailPrefix && !this.loadedUsers.has(emailPrefix)) {
         this.loadUserAssets(emailPrefix)
         this.load.start()
@@ -314,17 +272,14 @@ class MainScene extends Phaser.Scene {
       const remoteStatusMsg = user_info?.status_message || ''
 
       if (this.remotePlayerSprites.has(userId)) {
-        // 기존 플레이어 업데이트
         const container = this.remotePlayerSprites.get(userId)!
         const sprite = container.getAt(0) as Phaser.GameObjects.Sprite
 
-        // 상태 메시지 텍스트 업데이트 (container의 3번째 자식)
         const statusText = container.getAt(2) as Phaser.GameObjects.Text | undefined
         if (statusText) {
           statusText.setText(remoteStatusMsg)
         }
 
-        // 위치 트윈 애니메이션
         this.tweens.add({
           targets: container,
           x: targetX,
@@ -336,11 +291,9 @@ class MainScene extends Phaser.Scene {
           }
         })
 
-        // 방향에 따른 텍스처 변경
         const textureKey = this.getTextureKey(emailPrefix, position.direction)
         sprite.setTexture(textureKey)
       } else {
-        // 새 플레이어 생성
         const container = this.add.container(targetX, targetY)
 
         const textureKey = this.getTextureKey(emailPrefix, position.direction)
@@ -374,9 +327,6 @@ class MainScene extends Phaser.Scene {
     })
   }
 
-  /**
-   * Phaser 방향 → Storage 파일명 매핑
-   */
   private static DIRECTION_MAP: Record<string, string> = {
     up: 'back',
     down: 'front',
@@ -385,17 +335,12 @@ class MainScene extends Phaser.Scene {
     default: 'default',
   }
 
-  /**
-   * username + 방향에 따른 텍스처 키 반환
-   * 유저 텍스처가 없으면 기본 캐릭터(default) 텍스처로 폴백
-   */
   private getTextureKey(emailPrefix: string, direction: string): string {
     const storageDir = MainScene.DIRECTION_MAP[direction] || 'default'
     const key = `${emailPrefix}_${storageDir}`
     if (this.textures.exists(key)) {
       return key
     }
-    // 유저 커스텀 이미지가 없으면 기본 캐릭터 텍스처 사용
     const fallbackKey = `default_${storageDir}`
     if (this.textures.exists(fallbackKey)) {
       return fallbackKey
@@ -404,85 +349,71 @@ class MainScene extends Phaser.Scene {
   }
 
   /**
-   * 카메라를 브라우저 크기에 맞춰 맵 전체가 보이도록 zoom + 위치 설정
-   * - 맵 Top edge가 브라우저 상단에 붙도록 고정
-   * - 수평은 중앙 정렬
+   * 카메라 줌 설정 — 데스크톱은 맵 전체 보기, 모바일은 캐릭터 중심
    */
   private updateCameraFit() {
     const cam = this.cameras.main
     const zoomX = cam.width / MAP_WIDTH
     const zoomY = cam.height / MAP_HEIGHT
-    const zoom = Math.min(zoomX, zoomY)
+    const fitZoom = Math.min(zoomX, zoomY)
+
+    // 최소 줌 0.8 — 모바일에서 캐릭터가 보이도록
+    const zoom = Math.max(fitZoom, 0.8)
     cam.setZoom(zoom)
-
-    // 줌 적용 후 월드 좌표 기준 보이는 영역 크기
-    const visibleW = cam.width / zoom
-    const visibleH = cam.height / zoom
-
-    // 수평 중앙, 수직은 맵 Top이 뷰포트 상단에 붙도록
-    cam.scrollX = (MAP_WIDTH - visibleW) / 2
-    cam.scrollY = 0
-
-    cam.removeBounds()
   }
 
   update() {
-    // 이동 중이면 입력 무시
     if (this.isMoving) return
 
-    // 방향키 입력 처리
     let newGridX = this.gridX
     let newGridY = this.gridY
     let newDirection = this.direction
 
-    if (this.cursors.space.isDown) {
+    // 키보드 + 모바일 터치 D-pad 입력 처리
+    const kb = this.cursors
+    const td = mobileDirection
+
+    if ((kb?.space?.isDown) || td === 'default') {
       newDirection = 'default'
-    } else if (this.cursors.up.isDown) {
+    } else if ((kb?.up?.isDown) || td === 'up') {
       newGridY = Math.max(0, this.gridY - 1)
       newDirection = 'up'
-    } else if (this.cursors.down.isDown) {
+    } else if ((kb?.down?.isDown) || td === 'down') {
       newGridY = Math.min(GRID_HEIGHT - 1, this.gridY + 1)
       newDirection = 'down'
-    } else if (this.cursors.left.isDown) {
+    } else if ((kb?.left?.isDown) || td === 'left') {
       newGridX = Math.max(0, this.gridX - 1)
       newDirection = 'left'
-    } else if (this.cursors.right.isDown) {
+    } else if ((kb?.right?.isDown) || td === 'right') {
       newGridX = Math.min(GRID_WIDTH - 1, this.gridX + 1)
       newDirection = 'right'
     }
 
-    // 위치가 변경되었으면 이동
     if (newGridX !== this.gridX || newGridY !== this.gridY) {
       this.direction = newDirection
       this.gridX = newGridX
       this.gridY = newGridY
       this.movePlayer()
     } else if (newDirection !== this.direction) {
-      // 방향만 변경된 경우 텍스처만 업데이트
       this.direction = newDirection
       this.player.setTexture(this.getTextureKey(this.myEmailPrefix, this.direction))
     }
   }
 
-  /**
-   * 플레이어 이동 애니메이션
-   */
   private movePlayer() {
     this.isMoving = true
     const targetX = this.gridX * TILE_SIZE + TILE_SIZE / 2
     const targetY = this.gridY * TILE_SIZE + TILE_SIZE / 2
 
-    // 텍스처 변경
     this.player.setTexture(this.getTextureKey(this.myEmailPrefix, this.direction))
 
-    // 이동 트윈
     this.tweens.add({
       targets: [this.player, this.playerNameText, this.playerStatusText],
       x: targetX,
       y: (target: Phaser.GameObjects.GameObject) => {
         if (target === this.player) return targetY
         if (target === this.playerNameText) return targetY - TILE_SIZE * 1.5
-        return targetY - TILE_SIZE * 1.5 + 14 // playerStatusText
+        return targetY - TILE_SIZE * 1.5 + 14
       },
       duration: 150,
       ease: 'Linear',
@@ -490,7 +421,6 @@ class MainScene extends Phaser.Scene {
         this.isMoving = false
         this.player.setDepth(this.gridY)
 
-        // React로 위치 변경 이벤트 전송
         EventBus.emit(GameEvents.PLAYER_MOVE, {
           gridX: this.gridX,
           gridY: this.gridY,
@@ -500,9 +430,6 @@ class MainScene extends Phaser.Scene {
     })
   }
 
-  /**
-   * 플레이어 위치 즉시 업데이트 (초기화용)
-   */
   private updatePlayerPosition() {
     const x = this.gridX * TILE_SIZE + TILE_SIZE / 2
     const y = this.gridY * TILE_SIZE + TILE_SIZE / 2
@@ -513,21 +440,24 @@ class MainScene extends Phaser.Scene {
     this.playerStatusText.setPosition(x, y - TILE_SIZE * 1.5 + 14)
   }
 
-  /**
-   * 씬 정리
-   */
   shutdown() {
     if (this.isShutDown) return
     this.isShutDown = true
 
-    // EventBus 이벤트 리스너 해제
     EventBus.off(GameEvents.REMOTE_PLAYERS_UPDATE, this.handleRemotePlayersUpdate, this)
     EventBus.off(GameEvents.MY_INFO_UPDATE, this.handleMyInfoUpdate, this)
 
-    // 원격 플레이어 스프라이트 정리
     this.remotePlayerSprites.forEach((container) => container.destroy())
     this.remotePlayerSprites.clear()
   }
+}
+
+// D-pad 버튼 핸들러
+function dpadDown(dir: string) {
+  mobileDirection = dir
+}
+function dpadUp() {
+  mobileDirection = null
 }
 
 /**
@@ -536,39 +466,41 @@ class MainScene extends Phaser.Scene {
 const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
   const { remotePlayers, isConnected, myName, myEmailPrefix, myStatusMessage, myGridPos, onPositionChange } = props
 
-  // 게임 인스턴스 ref
   const gameRef = useRef<Phaser.Game | null>(null)
-  // 게임 컨테이너 DOM ref
   const containerRef = useRef<HTMLDivElement>(null)
-  // 현재 씬 ref
   const sceneRef = useRef<Phaser.Scene | null>(null)
-  // 씬 준비 완료 여부
   const sceneReadyRef = useRef<boolean>(false)
-  // 최신 props를 씬 ready 시점에 전달하기 위한 refs
   const latestPropsRef = useRef({ myName, myEmailPrefix, myStatusMessage, myGridPos, remotePlayers })
   latestPropsRef.current = { myName, myEmailPrefix, myStatusMessage, myGridPos, remotePlayers }
 
-  // 외부에서 게임 인스턴스에 접근할 수 있도록 설정
+  const [showDpad, setShowDpad] = useState(false)
+
   useImperativeHandle(ref, () => ({
     game: gameRef.current,
     scene: sceneRef.current,
   }))
 
-  // Phaser 게임 인스턴스 생성 및 정리
+  // D-pad 표시 여부 (모바일 or 터치 디바이스)
   useEffect(() => {
-    // 이미 게임이 존재하면 스킵
+    const check = () => setShowDpad(window.innerWidth < 1024 || navigator.maxTouchPoints > 0)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  // Phaser 게임 인스턴스 생성
+  useEffect(() => {
     if (gameRef.current) return
 
-    // Phaser 게임 설정
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
       parent: containerRef.current || undefined,
       width: window.innerWidth,
       height: window.innerHeight,
       backgroundColor: '#ffffff',
-      pixelArt: true, // 픽셀 아트 스타일 (이미지 스무딩 비활성화)
+      pixelArt: true,
       scale: {
-        mode: Phaser.Scale.RESIZE, // 화면 크기에 맞게 자동 조정
+        mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH,
       },
       physics: {
@@ -579,37 +511,34 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
         },
       },
       scene: [MainScene],
+      input: {
+        touch: { capture: true },
+      },
     }
 
-    // 게임 인스턴스 생성
     const game = new Phaser.Game(config)
     gameRef.current = game
 
-    // 씬 준비 완료 이벤트 리스너
     const handleSceneReady = (scene: Phaser.Scene) => {
       sceneRef.current = scene
       sceneReadyRef.current = true
       EventBus.emit(GameEvents.GAME_READY, game)
-      // 씬이 준비되면 현재 데이터를 즉시 전달 (WS 데이터가 먼저 도착했을 수 있음)
       const p = latestPropsRef.current
       EventBus.emit(GameEvents.MY_INFO_UPDATE, { name: p.myName, emailPrefix: p.myEmailPrefix, statusMessage: p.myStatusMessage, gridPos: p.myGridPos })
       EventBus.emit(GameEvents.REMOTE_PLAYERS_UPDATE, p.remotePlayers)
     }
     EventBus.on(GameEvents.SCENE_READY, handleSceneReady)
 
-    // 플레이어 이동 이벤트 리스너 (React로 전달)
     const handlePlayerMove = (data: { gridX: number; gridY: number; direction: string }) => {
       onPositionChange(data.gridX, data.gridY, data.direction)
     }
     EventBus.on(GameEvents.PLAYER_MOVE, handlePlayerMove)
 
-    // cleanup 함수
     return () => {
       EventBus.off(GameEvents.SCENE_READY, handleSceneReady)
       EventBus.off(GameEvents.PLAYER_MOVE, handlePlayerMove)
       sceneReadyRef.current = false
 
-      // 게임 인스턴스 파괴
       if (gameRef.current) {
         gameRef.current.destroy(true)
         gameRef.current = null
@@ -618,32 +547,122 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
     }
   }, [onPositionChange])
 
-  // 원격 플레이어 업데이트를 Phaser로 전달
   useEffect(() => {
     if (sceneReadyRef.current) {
       EventBus.emit(GameEvents.REMOTE_PLAYERS_UPDATE, remotePlayers)
     }
   }, [remotePlayers])
 
-  // 내 정보 업데이트를 Phaser로 전달
   useEffect(() => {
     if (sceneReadyRef.current) {
       EventBus.emit(GameEvents.MY_INFO_UPDATE, { name: myName, emailPrefix: myEmailPrefix, statusMessage: myStatusMessage, gridPos: myGridPos })
     }
   }, [myName, myEmailPrefix, myStatusMessage, myGridPos])
 
+  const btnStyle: React.CSSProperties = {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    border: 'none',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    color: '#fff',
+    fontSize: 20,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    touchAction: 'none',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    cursor: 'pointer',
+  }
+
   return (
-    <div
-      ref={containerRef}
-      id="phaser-game-container"
-      style={{
-        width: '100%',
-        height: '100%',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-      }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        id="phaser-game-container"
+        style={{
+          width: '100%',
+          height: '100%',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          touchAction: 'none',
+        }}
+      />
+
+      {/* 모바일 D-pad */}
+      {showDpad && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            zIndex: 200,
+            display: 'grid',
+            gridTemplateColumns: '48px 48px 48px',
+            gridTemplateRows: '48px 48px 48px',
+            gap: 4,
+            touchAction: 'none',
+          }}
+        >
+          {/* Row 1: empty, up, empty */}
+          <div />
+          <button
+            style={btnStyle}
+            onPointerDown={() => dpadDown('up')}
+            onPointerUp={dpadUp}
+            onPointerLeave={dpadUp}
+            onPointerCancel={dpadUp}
+          >
+            ▲
+          </button>
+          <div />
+
+          {/* Row 2: left, pose, right */}
+          <button
+            style={btnStyle}
+            onPointerDown={() => dpadDown('left')}
+            onPointerUp={dpadUp}
+            onPointerLeave={dpadUp}
+            onPointerCancel={dpadUp}
+          >
+            ◀
+          </button>
+          <button
+            style={{ ...btnStyle, fontSize: 12 }}
+            onPointerDown={() => dpadDown('default')}
+            onPointerUp={dpadUp}
+            onPointerLeave={dpadUp}
+            onPointerCancel={dpadUp}
+          >
+            포즈
+          </button>
+          <button
+            style={btnStyle}
+            onPointerDown={() => dpadDown('right')}
+            onPointerUp={dpadUp}
+            onPointerLeave={dpadUp}
+            onPointerCancel={dpadUp}
+          >
+            ▶
+          </button>
+
+          {/* Row 3: empty, down, empty */}
+          <div />
+          <button
+            style={btnStyle}
+            onPointerDown={() => dpadDown('down')}
+            onPointerUp={dpadUp}
+            onPointerLeave={dpadUp}
+            onPointerCancel={dpadUp}
+          >
+            ▼
+          </button>
+          <div />
+        </div>
+      )}
+    </>
   )
 })
 

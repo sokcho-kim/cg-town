@@ -181,10 +181,10 @@ export default function DogamDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-8">
+    <div className="min-h-screen bg-white p-4 sm:p-8">
       <div className="max-w-2xl mx-auto">
         {/* Back button + Edit buttons */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
           <Link
             href="/dogam"
             className="inline-flex items-center text-gray-500 hover:text-gray-900 transition"
@@ -196,13 +196,13 @@ export default function DogamDetailPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowImageEditor(true)}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-xs sm:text-sm"
               >
                 이미지 편집
               </button>
               <Link
                 href={isOwnProfile ? '/dogam/edit' : `/dogam/edit?id=${profile.id}`}
-                className="px-4 py-2 bg-[#E8852C] text-white rounded-lg hover:bg-[#D4741F] transition text-sm"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#E8852C] text-white rounded-lg hover:bg-[#D4741F] transition text-xs sm:text-sm"
               >
                 프로필 편집
               </Link>
@@ -213,7 +213,7 @@ export default function DogamDetailPage() {
         {/* Profile Card */}
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
           {/* Top Section: Character Slider + Name */}
-          <div className="bg-gradient-to-b from-[#E8852C]/10 to-transparent p-8 flex flex-col items-center">
+          <div className="bg-gradient-to-b from-[#E8852C]/10 to-transparent p-4 sm:p-8 flex flex-col items-center">
 
             {/* Character Image Slider */}
             <div className="relative mb-4">
@@ -251,7 +251,7 @@ export default function DogamDetailPage() {
               ))}
             </div>
 
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
               {profile.username || '이름 없음'}
             </h1>
 
@@ -286,7 +286,7 @@ export default function DogamDetailPage() {
           </div>
 
           {/* Info Section */}
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-5 sm:space-y-6">
             {/* Projects */}
             {resolvedProjects.length > 0 && (
               <div>
@@ -359,7 +359,7 @@ export default function DogamDetailPage() {
             </div>
 
             {/* 5 images grid */}
-            <div className="grid grid-cols-5 gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 sm:gap-4">
               {DIRECTIONS.map((dir) => (
                 <div key={dir} className="flex flex-col items-center">
                   <div className="w-full aspect-[1/2] bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden mb-2">

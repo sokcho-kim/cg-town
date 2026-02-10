@@ -165,7 +165,7 @@ export default function DogamEditPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-8">
+    <div className="min-h-screen bg-white p-4 sm:p-8">
       <div className="max-w-2xl mx-auto">
         {/* Back button */}
         <Link
@@ -181,7 +181,7 @@ export default function DogamEditPage() {
           </h1>
 
           {/* Name, Department, Position (read-only) */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
             <div>
               <label className="text-gray-500 text-sm block mb-1">이름</label>
               <div className="bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-sm">

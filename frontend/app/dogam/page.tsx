@@ -110,30 +110,30 @@ export default function DogamPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-8">
+    <div className="min-h-screen bg-white p-4 sm:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">CG Inside 직원 도감</h1>
-            <p className="text-gray-500 mt-1">우리 팀원을 소개합니다</p>
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-900">CG Inside 직원 도감</h1>
+            <p className="text-gray-500 text-sm sm:text-base mt-1">우리 팀원을 소개합니다</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3 flex-wrap">
             <Link
               href="/dogam/edit"
-              className="px-4 py-2 bg-[#E8852C] text-white rounded-lg hover:bg-[#D4741F] transition text-sm"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#E8852C] text-white rounded-lg hover:bg-[#D4741F] transition text-xs sm:text-sm"
             >
               내 프로필 편집
             </Link>
             <Link
               href="/"
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-xs sm:text-sm"
             >
               사무실로 가기
             </Link>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-xs sm:text-sm"
             >
               로그아웃
             </button>
@@ -141,13 +141,13 @@ export default function DogamPage() {
         </div>
 
         {/* Department Tabs */}
-        <div className="mb-6 overflow-x-auto scrollbar-hide">
-          <div className="flex gap-2 min-w-max pb-2">
+        <div className="mb-4 sm:mb-6 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-1.5 sm:gap-2 min-w-max pb-2">
             {tabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition ${
                   activeTab === tab
                     ? 'bg-[#E8852C] text-white'
                     : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
@@ -160,7 +160,7 @@ export default function DogamPage() {
         </div>
 
         {/* Profile Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
           {filteredProfiles.map((profile) => (
             <Link
               key={profile.id}
