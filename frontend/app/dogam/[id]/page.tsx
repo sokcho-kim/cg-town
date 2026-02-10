@@ -23,7 +23,6 @@ interface Profile {
   position: string
   field: string
   project: string
-  projects: string[]
   tmi: string
   tech_stack: string[]
   status_message: string
@@ -90,13 +89,9 @@ export default function DogamDetailPage() {
   const isOwnProfile = currentUserId === profile?.id
   const canEdit = isOwnProfile || isAdmin
 
-  // Resolve projects
-  const resolvedProjects: string[] = profile
-    ? Array.isArray(profile.projects) && profile.projects.length > 0
-      ? profile.projects
-      : profile.project
-        ? [profile.project]
-        : []
+  // Resolve projects (DB stores as comma-separated string)
+  const resolvedProjects: string[] = profile?.project
+    ? profile.project.split(', ').filter(Boolean)
     : []
 
   const emailPrefix = profile?.email ? getEmailPrefix(profile.email) : ''
@@ -104,7 +99,7 @@ export default function DogamDetailPage() {
   // Image URL with cache busting
   const getImgUrl = useCallback((dir: string) => {
     const url = getCharacterImageUrl(emailPrefix, dir)
-    return cacheBust ? `${url}?t=${cacheBust}` : url
+    return cacheBust ? `${url}&t=${cacheBust}` : url
   }, [emailPrefix, cacheBust])
 
   // Direction remapping handlers

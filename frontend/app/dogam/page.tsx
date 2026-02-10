@@ -90,7 +90,7 @@ export default function DogamPage() {
 
   // Filtered + sorted profiles based on active tab
   const filteredProfiles = useMemo(() => {
-    if (activeTab === TAB_ALL) return sortProfiles(humanProfiles)
+    if (activeTab === TAB_ALL) return sortProfiles([...humanProfiles, ...npcProfiles])
     if (activeTab === TAB_NPC) return npcProfiles
     return sortProfiles(humanProfiles.filter((p) => p.department === activeTab))
   }, [activeTab, humanProfiles, npcProfiles])

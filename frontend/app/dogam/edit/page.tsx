@@ -65,10 +65,8 @@ export default function DogamEditPage() {
       if (data) {
         setProfile(data)
         setField(data.field || '')
-        if (Array.isArray(data.projects)) {
-          setProjects(data.projects)
-        } else if (data.project && typeof data.project === 'string') {
-          setProjects(data.project ? [data.project] : [])
+        if (data.project && typeof data.project === 'string') {
+          setProjects(data.project.split(', ').filter(Boolean))
         } else {
           setProjects([])
         }
@@ -86,16 +84,22 @@ export default function DogamEditPage() {
     setSaving(true)
 
     const supabase = createClient()
-    await supabase
+    const { error } = await supabase
       .from('profiles')
       .update({
         field,
-        projects,
+        project: projects.join(', '),
         tmi,
         tech_stack: techStack,
         status_message: statusMessage,
       })
       .eq('id', profile.id)
+
+    if (error) {
+      alert('저장 실패: ' + error.message)
+      setSaving(false)
+      return
+    }
 
     setSaving(false)
     router.push(`/dogam/${profile.id}`)
