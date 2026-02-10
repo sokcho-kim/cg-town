@@ -18,12 +18,12 @@ const PhaserGame = dynamic(() => import('@/components/PhaserGame'), {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#1a1a2e',
+        backgroundColor: '#ffffff',
         color: '#ffffff',
         fontSize: '18px',
       }}
     >
-      게임 로딩 중...
+      사무실로 가는 중...
     </div>
   ),
 })

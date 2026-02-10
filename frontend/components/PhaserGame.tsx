@@ -565,7 +565,7 @@ const PhaserGame = forwardRef<PhaserGameRef, PhaserGameProps>((props, ref) => {
       parent: containerRef.current || undefined,
       width: window.innerWidth,
       height: window.innerHeight,
-      backgroundColor: '#1a1a2e',
+      backgroundColor: '#ffffff',
       pixelArt: true, // 픽셀 아트 스타일 (이미지 스무딩 비활성화)
       scale: {
         mode: Phaser.Scale.RESIZE, // 화면 크기에 맞게 자동 조정

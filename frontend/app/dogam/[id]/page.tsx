@@ -163,17 +163,17 @@ export default function DogamDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center">
-        <p className="text-white text-lg">Loading...</p>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-900 text-lg">Loading...</p>
       </div>
     )
   }
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-[#1a1a2e] flex flex-col items-center justify-center gap-4">
-        <p className="text-white text-lg">프로필을 찾을 수 없습니다</p>
-        <Link href="/dogam" className="text-indigo-400 hover:underline">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-4">
+        <p className="text-gray-900 text-lg">프로필을 찾을 수 없습니다</p>
+        <Link href="/dogam" className="text-[#E8852C] hover:underline">
           도감으로 돌아가기
         </Link>
       </div>
@@ -181,13 +181,13 @@ export default function DogamDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1a2e] p-8">
+    <div className="min-h-screen bg-white p-8">
       <div className="max-w-2xl mx-auto">
         {/* Back button + Edit buttons */}
         <div className="flex items-center justify-between mb-6">
           <Link
             href="/dogam"
-            className="inline-flex items-center text-gray-400 hover:text-white transition"
+            className="inline-flex items-center text-gray-500 hover:text-gray-900 transition"
           >
             &larr; 도감 목록
           </Link>
@@ -202,7 +202,7 @@ export default function DogamDetailPage() {
               </button>
               <Link
                 href={isOwnProfile ? '/dogam/edit' : `/dogam/edit?id=${profile.id}`}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm"
+                className="px-4 py-2 bg-[#E8852C] text-white rounded-lg hover:bg-[#D4741F] transition text-sm"
               >
                 프로필 편집
               </Link>
@@ -211,13 +211,13 @@ export default function DogamDetailPage() {
         </div>
 
         {/* Profile Card */}
-        <div className="bg-[#16213e] rounded-2xl border border-gray-800 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
           {/* Top Section: Character Slider + Name */}
-          <div className="bg-gradient-to-b from-indigo-900/30 to-transparent p-8 flex flex-col items-center">
+          <div className="bg-gradient-to-b from-[#E8852C]/10 to-transparent p-8 flex flex-col items-center">
 
             {/* Character Image Slider */}
             <div className="relative mb-4">
-              <div className="w-48 h-48 bg-[#0f3460]/30 rounded-2xl flex items-center justify-center overflow-hidden">
+              <div className="w-48 h-48 bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden">
                 {emailPrefix ? (
                   <img
                     key={`${DIRECTIONS[activeSlide]}-${cacheBust}`}
@@ -245,13 +245,13 @@ export default function DogamDetailPage() {
                   key={dir}
                   onClick={() => setActiveSlide(i)}
                   className={`w-2.5 h-2.5 rounded-full transition ${
-                    i === activeSlide ? 'bg-indigo-400 scale-110' : 'bg-gray-600 hover:bg-gray-500'
+                    i === activeSlide ? 'bg-[#E8852C] scale-110' : 'bg-gray-300 hover:bg-gray-400'
                   }`}
                 />
               ))}
             </div>
 
-            <h1 className="text-2xl font-bold text-white">
+            <h1 className="text-2xl font-bold text-gray-900">
               {profile.username || '이름 없음'}
             </h1>
 
@@ -259,7 +259,7 @@ export default function DogamDetailPage() {
             {profile.status_message && (
               <div className="flex items-center gap-2 mt-2">
                 <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-gray-300 text-sm italic">
+                <span className="text-gray-600 text-sm italic">
                   {profile.status_message}
                 </span>
               </div>
@@ -268,17 +268,17 @@ export default function DogamDetailPage() {
             {/* Badges: Department, Position, Field */}
             <div className="flex gap-2 mt-3 flex-wrap justify-center">
               {profile.department && (
-                <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-sm">
+                <span className="px-3 py-1 bg-[#E8852C]/10 text-[#E8852C] rounded-full text-sm">
                   {profile.department}
                 </span>
               )}
               {profile.position && (
-                <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-full text-sm">
+                <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm">
                   {profile.position}
                 </span>
               )}
               {profile.field && (
-                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-sm">
+                <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm">
                   {profile.field}
                 </span>
               )}
@@ -290,12 +290,12 @@ export default function DogamDetailPage() {
             {/* Projects */}
             {resolvedProjects.length > 0 && (
               <div>
-                <h3 className="text-gray-400 text-sm font-medium mb-2">현재 프로젝트</h3>
+                <h3 className="text-gray-500 text-sm font-medium mb-2">현재 프로젝트</h3>
                 <div className="flex flex-wrap gap-2">
                   {resolvedProjects.map((proj, i) => (
                     <span
                       key={i}
-                      className="px-3 py-1 bg-cyan-500/20 text-cyan-300 rounded-lg text-sm"
+                      className="px-3 py-1 bg-cyan-100 text-cyan-700 rounded-lg text-sm"
                     >
                       {proj}
                     </span>
@@ -307,12 +307,12 @@ export default function DogamDetailPage() {
             {/* Tech Stack */}
             {profile.tech_stack && profile.tech_stack.length > 0 && (
               <div>
-                <h3 className="text-gray-400 text-sm font-medium mb-2">기술스택</h3>
+                <h3 className="text-gray-500 text-sm font-medium mb-2">기술스택</h3>
                 <div className="flex flex-wrap gap-2">
                   {profile.tech_stack.map((tech, i) => (
                     <span
                       key={i}
-                      className="px-3 py-1 bg-gray-700/50 text-gray-300 rounded-lg text-sm"
+                      className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-sm"
                     >
                       {tech}
                     </span>
@@ -324,8 +324,8 @@ export default function DogamDetailPage() {
             {/* TMI */}
             {profile.tmi && (
               <div>
-                <h3 className="text-gray-400 text-sm font-medium mb-2">TMI</h3>
-                <div className="bg-[#0f3460]/20 rounded-xl p-4 text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">
+                <h3 className="text-gray-500 text-sm font-medium mb-2">TMI</h3>
+                <div className="bg-gray-50 rounded-xl p-4 text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
                   {profile.tmi}
                 </div>
               </div>
@@ -333,7 +333,7 @@ export default function DogamDetailPage() {
 
             {/* No info yet */}
             {!profile.tmi && (!profile.tech_stack || profile.tech_stack.length === 0) && resolvedProjects.length === 0 && (
-              <div className="text-center text-gray-500 py-8">
+              <div className="text-center text-gray-400 py-8">
                 <p>아직 작성된 정보가 없습니다</p>
               </div>
             )}
@@ -344,15 +344,15 @@ export default function DogamDetailPage() {
       {/* Image Editor Modal */}
       {showImageEditor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-[#16213e] rounded-2xl border border-gray-800 p-6 max-w-2xl w-full mx-4">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 max-w-2xl w-full mx-4 shadow-xl">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold text-white">이미지 방향 편집</h2>
+              <h2 className="text-lg font-bold text-gray-900">이미지 방향 편집</h2>
               <button
                 onClick={() => {
                   setShowImageEditor(false)
                   setDirMapping({ default: 'default', front: 'front', back: 'back', left: 'left', right: 'right' })
                 }}
-                className="text-gray-400 hover:text-white text-xl"
+                className="text-gray-400 hover:text-gray-900 text-xl"
               >
                 &times;
               </button>
@@ -362,7 +362,7 @@ export default function DogamDetailPage() {
             <div className="grid grid-cols-5 gap-4">
               {DIRECTIONS.map((dir) => (
                 <div key={dir} className="flex flex-col items-center">
-                  <div className="w-full aspect-[1/2] bg-[#0f3460]/30 rounded-lg flex items-center justify-center overflow-hidden mb-2">
+                  <div className="w-full aspect-[1/2] bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden mb-2">
                     <img
                       src={getImgUrl(dir)}
                       alt={dir}
@@ -375,7 +375,7 @@ export default function DogamDetailPage() {
                   <select
                     value={dirMapping[dir]}
                     onChange={(e) => handleDirChange(dir, e.target.value)}
-                    className="w-full bg-gray-800 text-white text-xs rounded px-2 py-1.5 border border-gray-700 focus:border-indigo-500 focus:outline-none"
+                    className="w-full bg-gray-50 text-gray-900 text-xs rounded px-2 py-1.5 border border-gray-300 focus:border-[#E8852C] focus:outline-none"
                   >
                     {DIRECTIONS.map((d) => (
                       <option key={d} value={d}>{DIRECTION_LABELS[d]}</option>
@@ -392,7 +392,7 @@ export default function DogamDetailPage() {
                   setShowImageEditor(false)
                   setDirMapping({ default: 'default', front: 'front', back: 'back', left: 'left', right: 'right' })
                 }}
-                className="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm hover:bg-gray-600 transition"
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition"
               >
                 취소
               </button>

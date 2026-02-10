@@ -103,37 +103,37 @@ export default function DogamPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center">
-        <p className="text-white text-lg">Loading...</p>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <p className="text-gray-900 text-lg">Loading...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1a2e] p-8">
+    <div className="min-h-screen bg-white p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white">CG Inside 직원 도감</h1>
-            <p className="text-gray-400 mt-1">우리 팀원을 소개합니다</p>
+            <h1 className="text-3xl font-bold text-gray-900">CG Inside 직원 도감</h1>
+            <p className="text-gray-500 mt-1">우리 팀원을 소개합니다</p>
           </div>
           <div className="flex gap-3">
             <Link
               href="/dogam/edit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm"
+              className="px-4 py-2 bg-[#E8852C] text-white rounded-lg hover:bg-[#D4741F] transition text-sm"
             >
               내 프로필 편집
             </Link>
             <Link
               href="/"
-              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition text-sm"
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm"
             >
-              게임으로 돌아가기
+              사무실로 가기
             </Link>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 transition text-sm"
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
             >
               로그아웃
             </button>
@@ -149,8 +149,8 @@ export default function DogamPage() {
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
                   activeTab === tab
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-[#16213e] text-gray-300 hover:bg-[#1a2745] border border-gray-700'
+                    ? 'bg-[#E8852C] text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
                 }`}
               >
                 {tab}
@@ -165,10 +165,10 @@ export default function DogamPage() {
             <Link
               key={profile.id}
               href={`/dogam/${profile.id}`}
-              className="group bg-[#16213e] rounded-xl p-4 hover:bg-[#1a2745] transition border border-gray-800 hover:border-indigo-500/50"
+              className="group bg-white rounded-xl p-4 hover:bg-gray-50 transition border border-gray-200 hover:border-[#E8852C]/50"
             >
               {/* Character Image */}
-              <div className="aspect-[3/4] bg-[#0f3460]/30 rounded-lg mb-3 relative overflow-hidden">
+              <div className="aspect-[3/4] bg-gray-100 rounded-lg mb-3 relative overflow-hidden">
                 {profile.email ? (
                   <img
                     src={getCharacterImageUrl(getEmailPrefix(profile.email), 'front')}
@@ -183,14 +183,14 @@ export default function DogamPage() {
               </div>
 
               {/* Info */}
-              <h3 className="text-white font-semibold text-center truncate">
+              <h3 className="text-gray-900 font-semibold text-center truncate">
                 {profile.username || '이름 없음'}
               </h3>
-              <p className="text-gray-400 text-xs text-center mt-1 truncate">
+              <p className="text-gray-500 text-xs text-center mt-1 truncate">
                 {profile.department || ''}
               </p>
               {profile.field && (
-                <p className="text-indigo-400 text-xs text-center mt-1 truncate">
+                <p className="text-[#E8852C] text-xs text-center mt-1 truncate">
                   {profile.field}
                 </p>
               )}
@@ -199,7 +199,7 @@ export default function DogamPage() {
         </div>
 
         {filteredProfiles.length === 0 && (
-          <div className="text-center text-gray-500 py-20">
+          <div className="text-center text-gray-400 py-20">
             <p className="text-lg">
               {activeTab === TAB_NPC
                 ? '등록된 NPC가 없습니다'
