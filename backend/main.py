@@ -27,6 +27,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",  # Next.js 개발 서버
         "http://localhost:3001",  # Next.js 개발 서버 (대체 포트)
+        "https://cg-town.vercel.app",  # Vercel 프로덕션
     ],
     allow_credentials=True,
     allow_methods=["*"],

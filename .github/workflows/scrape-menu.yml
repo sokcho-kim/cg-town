@@ -1,0 +1,27 @@
+name: Weekly Menu Scrape
+
+on:
+  schedule:
+    # 매주 월요일 한국시간 09:00 (UTC 00:00)
+    - cron: '0 0 * * 1'
+  workflow_dispatch: # 수동 실행 가능
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r tests/cafeteria-menu-scraper/requirements.txt
+
+      - name: Run menu scraper
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          BACKEND_API_URL: ${{ secrets.BACKEND_API_URL }}
+          SCRAPER_SECRET_KEY: ${{ secrets.SCRAPER_SECRET_KEY }}
+        run: python tests/cafeteria-menu-scraper/scrape_menu.py
