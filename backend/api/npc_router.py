@@ -49,6 +49,43 @@ class SettingsRequest(BaseModel):
     show_sources: bool | None = None
 
 
+# ===== 대화 히스토리 헬퍼 =====
+
+HISTORY_LIMIT = 20  # DB에서 가져올 최근 메시지 수
+
+
+def _fetch_history(user_id: str) -> list[dict]:
+    """DB에서 유저의 최근 대화 히스토리 조회"""
+    try:
+        supabase = get_supabase_admin()
+        result = (
+            supabase.table("npc_chat_messages")
+            .select("role, content")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .limit(HISTORY_LIMIT)
+            .execute()
+        )
+        # 역순으로 뒤집어서 시간순 정렬
+        return list(reversed(result.data)) if result.data else []
+    except Exception as e:
+        logger.warning(f"대화 히스토리 조회 실패: {e}")
+        return []
+
+
+def _save_message(user_id: str, role: str, content: str):
+    """DB에 메시지 저장"""
+    try:
+        supabase = get_supabase_admin()
+        supabase.table("npc_chat_messages").insert({
+            "user_id": user_id,
+            "role": role,
+            "content": content,
+        }).execute()
+    except Exception as e:
+        logger.warning(f"메시지 저장 실패: {e}")
+
+
 # ===== 채팅 =====
 
 
@@ -58,7 +95,16 @@ async def npc_chat(body: ChatRequest, current_user=Depends(get_current_user)):
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="메시지를 입력해 주세요.")
 
-    result = await classify_and_route(body.message)
+    user_id = current_user.id
+    history = _fetch_history(user_id)
+
+    # 유저 메시지 저장
+    _save_message(user_id, "user", body.message)
+
+    result = await classify_and_route(body.message, history=history)
+
+    # 어시스턴트 응답 저장
+    _save_message(user_id, "assistant", result["answer"])
 
     return ChatResponse(
         answer=result["answer"],
@@ -74,15 +120,42 @@ async def npc_chat_stream(body: ChatRequest, current_user=Depends(get_current_us
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="메시지를 입력해 주세요.")
 
+    user_id = current_user.id
+    history = _fetch_history(user_id)
+
+    # 유저 메시지 저장
+    _save_message(user_id, "user", body.message)
+
+    full_answer_parts: list[str] = []
+
     async def event_generator():
-        async for event in classify_and_route_stream(body.message):
+        async for event in classify_and_route_stream(body.message, history=history):
+            # 응답 토큰 수집 (저장용)
+            if event.get("type") == "token" and event.get("content"):
+                full_answer_parts.append(event["content"])
+            elif event.get("type") == "tag_result" and event.get("data", {}).get("answer"):
+                full_answer_parts.append(event["data"]["answer"])
+
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+        # 스트리밍 완료 후 어시스턴트 응답 DB 저장
+        full_answer = "".join(full_answer_parts)
+        if full_answer:
+            _save_message(user_id, "assistant", full_answer)
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.delete("/chat/history")
+async def clear_chat_history(current_user=Depends(get_current_user)):
+    """대화 히스토리 초기화"""
+    supabase = get_supabase_admin()
+    supabase.table("npc_chat_messages").delete().eq("user_id", current_user.id).execute()
+    return {"message": "대화 히스토리가 초기화되었습니다."}
 
 
 # ===== 설정 =====

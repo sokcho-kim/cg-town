@@ -103,8 +103,16 @@ export default function NpcChat({ npcName, onClose }: NpcChatProps) {
           try {
             const event = JSON.parse(jsonStr)
 
-            if (event.type === 'token' && event.token) {
-              fullAnswer += event.token
+            if (event.type === 'tag_result' && event.data?.answer) {
+              // TAG 경로 (직원수, 메뉴 등 즉시 응답)
+              fullAnswer = event.data.answer
+              setMessages(prev => {
+                const updated = [...prev]
+                updated[updated.length - 1] = { role: 'assistant', content: fullAnswer }
+                return updated
+              })
+            } else if (event.type === 'token' && (event.token || event.content)) {
+              fullAnswer += event.token || event.content
               setMessages(prev => {
                 const updated = [...prev]
                 updated[updated.length - 1] = { role: 'assistant', content: fullAnswer }

@@ -27,10 +27,59 @@ def _query_profiles(select: str, filters: dict | None = None, exclude_npc: bool 
     return query.execute()
 
 
-async def get_employee_count() -> dict:
-    """전체 직원 수 조회"""
-    result = _query_profiles("id")
-    return {"answer": f"현재 CG Inside에는 총 {result.count}명의 직원이 있습니다."}
+async def get_employee_search(position: str | None = None, department: str | None = None, name: str | None = None) -> dict:
+    """직원 검색 (이름/직급/부서 복합 필터)"""
+    supabase = get_supabase_client()
+    select_fields = "username, department, position, field"
+
+    # 필터가 하나도 없으면 전체 인원수
+    if not position and not department and not name:
+        result = _query_profiles("id")
+        return {"answer": f"현재 CG Inside에는 총 {result.count}명의 직원이 있습니다."}
+
+    try:
+        query = supabase.table("profiles").select(select_fields, count="exact").eq("is_npc", False)
+    except Exception:
+        query = supabase.table("profiles").select(select_fields, count="exact")
+
+    if position:
+        query = query.ilike("position", f"%{position}%")
+    if department:
+        query = query.ilike("department", f"%{department}%")
+    if name:
+        query = query.ilike("username", f"%{name}%")
+
+    result = query.execute()
+
+    filters_desc = []
+    if position:
+        filters_desc.append(f"직급 '{position}'")
+    if department:
+        filters_desc.append(f"부서 '{department}'")
+    if name:
+        filters_desc.append(f"이름 '{name}'")
+    filter_label = ", ".join(filters_desc)
+
+    if not result.data:
+        return {"answer": f"{filter_label}에 해당하는 직원이 없습니다."}
+
+    lines = []
+    for emp in result.data:
+        ename = emp.get("username", "이름 없음")
+        dept = emp.get("department", "")
+        pos = emp.get("position", "")
+        field = emp.get("field", "")
+        info = f"- {ename}"
+        if pos:
+            info += f" ({pos})"
+        if dept:
+            info += f" - {dept}"
+        if field:
+            info += f" [{field}]"
+        lines.append(info)
+
+    answer = f"{filter_label} 검색 결과 ({result.count}명):\n" + "\n".join(lines)
+    return {"answer": answer}
 
 
 async def get_department_count() -> dict:
@@ -44,29 +93,6 @@ async def get_department_count() -> dict:
 
     lines = [f"- {dept}: {count}명" for dept, count in sorted(dept_counts.items())]
     answer = "부서별 직원 현황입니다:\n" + "\n".join(lines)
-    return {"answer": answer}
-
-
-async def get_employees_by_department(department: str) -> dict:
-    """특정 부서 직원 목록 조회"""
-    result = _query_profiles("username, field, position", filters={"department": department})
-
-    if not result.data:
-        return {"answer": f"'{department}' 부서에 등록된 직원이 없습니다."}
-
-    lines = []
-    for emp in result.data:
-        name = emp.get("username", "이름 없음")
-        field = emp.get("field", "")
-        position = emp.get("position", "")
-        info = f"- {name}"
-        if position:
-            info += f" ({position})"
-        if field:
-            info += f" - {field}"
-        lines.append(info)
-
-    answer = f"{department} 소속 직원 목록입니다:\n" + "\n".join(lines)
     return {"answer": answer}
 
 
@@ -91,12 +117,13 @@ async def get_npc_list() -> dict:
     return {"answer": answer}
 
 
-async def get_cafeteria_menu() -> dict:
-    """오늘 식당 메뉴 조회"""
-    from datetime import date
+async def get_cafeteria_menu(day_param: str | None = None) -> dict:
+    """식당 메뉴 조회 (오늘/내일/특정 요일)"""
+    from datetime import date, timedelta
 
     supabase = get_supabase_client()
     DAY_MAP = {0: "월", 1: "화", 2: "수", 3: "목", 4: "금", 5: "토", 6: "일"}
+    DAY_LIST = ["월", "화", "수", "목", "금"]
 
     try:
         result = (
@@ -112,33 +139,52 @@ async def get_cafeteria_menu() -> dict:
     if not result.data:
         return {"answer": "아직 등록된 식단 정보가 없습니다. 담당자에게 문의해 주세요."}
 
-    today = DAY_MAP.get(date.today().weekday(), "")
     menus = result.data[0].get("menus", {})
-    today_menu = menus.get(today)
 
-    if not today_menu:
-        answer = f"오늘({today}요일)은 식단 정보가 없습니다.\n\n"
+    # 요일 결정
+    today_wd = date.today().weekday()
+    if day_param:
+        dp = day_param.strip()
+        if dp == "내일":
+            target_day = DAY_MAP.get((today_wd + 1) % 7, "")
+            label = "내일"
+        elif dp == "모레":
+            target_day = DAY_MAP.get((today_wd + 2) % 7, "")
+            label = "모레"
+        elif dp in DAY_LIST or dp in ["토", "일"]:
+            target_day = dp
+            label = f"{dp}요일"
+        else:
+            target_day = DAY_MAP.get(today_wd, "")
+            label = "오늘"
+    else:
+        target_day = DAY_MAP.get(today_wd, "")
+        label = "오늘"
+
+    target_menu = menus.get(target_day)
+
+    if not target_menu:
+        answer = f"{label}({target_day}요일)은 식단 정보가 없습니다.\n\n"
         answer += f"이번 주 식단 ({result.data[0].get('period', '')}):\n"
-        for day in ["월", "화", "수", "목", "금"]:
+        for day in DAY_LIST:
             dm = menus.get(day, {})
             items = dm.get("lunch", [])
             answer += f"\n{day}요일: {', '.join(items) if items else '정보 없음'}"
         return {"answer": answer}
 
-    items = today_menu.get("lunch", [])
-    answer = f"오늘({today}요일) 점심 메뉴입니다:\n"
+    items = target_menu.get("lunch", [])
+    answer = f"{label}({target_day}요일) 점심 메뉴입니다:\n"
     for item in items:
         answer += f"- {item}\n"
-    if today_menu.get("special"):
-        answer += f"\n특별 메뉴: {today_menu['special']}"
+    if target_menu.get("special"):
+        answer += f"\n특별 메뉴: {target_menu['special']}"
 
     return {"answer": answer}
 
 
 TAG_QUERY_MAP = {
-    "employee_count": get_employee_count,
+    "employee_search": get_employee_search,
     "department_count": get_department_count,
-    "employees_by_department": get_employees_by_department,
     "npc_list": get_npc_list,
     "cafeteria_menu": get_cafeteria_menu,
 }

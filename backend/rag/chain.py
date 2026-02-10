@@ -24,15 +24,24 @@ def format_docs(docs: list[dict]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-def _build_rag_messages(question: str, retrieved_docs: list[dict], settings: dict):
-    """RAG 프롬프트 메시지 구성"""
-    system_prompt = settings["system_prompt"] + "\n\n컨텍스트:\n{context}"
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "{question}"),
-    ])
+def _build_rag_messages(question: str, retrieved_docs: list[dict], settings: dict, history: list[dict] | None = None):
+    """RAG 프롬프트 메시지 구성 (대화 맥락 포함)"""
     context = format_docs(retrieved_docs)
-    return prompt.format_messages(context=context, question=question)
+    system_prompt = settings["system_prompt"] + """
+
+컨텍스트에 답이 없으면 자연스럽게 모른다고 말하되, 대화 맥락에서 답할 수 있는 질문은 상식적으로 답변하세요.
+
+컨텍스트:
+""" + context
+
+    msgs: list[tuple[str, str]] = [("system", system_prompt)]
+    # 대화 히스토리 (최대 4턴)
+    for h in (history or [])[-4:]:
+        role = "human" if h["role"] == "user" else "assistant"
+        msgs.append((role, h["content"]))
+    msgs.append(("human", question))
+
+    return ChatPromptTemplate.from_messages(msgs).format_messages()
 
 
 def _build_sources(retrieved_docs: list[dict], settings: dict) -> list[dict] | None:
@@ -48,7 +57,7 @@ def _build_sources(retrieved_docs: list[dict], settings: dict) -> list[dict] | N
     ]
 
 
-async def query_rag(question: str) -> dict:
+async def query_rag(question: str, history: list[dict] | None = None) -> dict:
     """RAG 파이프라인으로 질문에 답변 (동기, 전체 응답)"""
     settings = get_settings()
 
@@ -60,7 +69,7 @@ async def query_rag(question: str) -> dict:
         openai_api_key=OPENAI_API_KEY,
     )
 
-    messages = _build_rag_messages(question, retrieved_docs, settings)
+    messages = _build_rag_messages(question, retrieved_docs, settings, history)
     response = llm.invoke(messages)
 
     return {
@@ -69,7 +78,7 @@ async def query_rag(question: str) -> dict:
     }
 
 
-async def query_rag_stream(question: str) -> AsyncGenerator[dict, None]:
+async def query_rag_stream(question: str, history: list[dict] | None = None) -> AsyncGenerator[dict, None]:
     """RAG 파이프라인 스트리밍 응답 (SSE용)"""
     settings = get_settings()
 
@@ -82,7 +91,7 @@ async def query_rag_stream(question: str) -> AsyncGenerator[dict, None]:
         streaming=True,
     )
 
-    messages = _build_rag_messages(question, retrieved_docs, settings)
+    messages = _build_rag_messages(question, retrieved_docs, settings, history)
 
     # 소스 먼저 전송
     sources = _build_sources(retrieved_docs, settings)
