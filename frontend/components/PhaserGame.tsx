@@ -379,6 +379,7 @@ class MainScene extends Phaser.Scene {
     down: 'front',
     left: 'left',
     right: 'right',
+    default: 'default',
   }
 
   /**
@@ -408,7 +409,9 @@ class MainScene extends Phaser.Scene {
     let newGridY = this.gridY
     let newDirection = this.direction
 
-    if (this.cursors.up.isDown) {
+    if (this.cursors.space.isDown) {
+      newDirection = 'default'
+    } else if (this.cursors.up.isDown) {
       newGridY = Math.max(0, this.gridY - 1)
       newDirection = 'up'
     } else if (this.cursors.down.isDown) {

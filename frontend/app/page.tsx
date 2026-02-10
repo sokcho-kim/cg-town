@@ -76,6 +76,25 @@ export default function Home() {
           {isConnected ? `온라인 (${Object.keys(remotePlayers).length + 1}명)` : '연결 중...'}
         </div>
 
+        {/* 도감 버튼 */}
+        <button
+          onClick={() => router.push('/dogam')}
+          style={{
+            padding: '4px 10px',
+            borderRadius: '12px',
+            fontSize: '12px',
+            backgroundColor: 'rgba(59,130,246,0.8)',
+            color: 'white',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(37,99,235,0.9)')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.8)')}
+        >
+          도감
+        </button>
+
         {/* 로그아웃 버튼 */}
         <button
           onClick={handleLogout}
