@@ -1,6 +1,6 @@
 # CG Town 작업 목록
 
-> 최종 업데이트: 2026-02-09
+> 최종 업데이트: 2026-02-10
 
 ---
 
@@ -74,8 +74,8 @@
 |---|------|------|------|------|
 | 18 | ~~테스트 개발 폴더 구조~~ | 지민 | DONE | `tests/` 생성 |
 | 19 | 회의실 자동예약 기능 | 지민 | TODO | `tests/meeting-room-booking/` |
-| 20 | 오늘 식당 메뉴 스크래핑 | 지민 | TODO | `tests/cafeteria-menu-scraper/` |
-| 21 | NPC 말풍선 (공지/메뉴) | 지민 | TODO | NPC 공지사항/식당 메뉴 표시 |
+| 20 | ~~오늘 식당 메뉴 스크래핑~~ | 지민 | DONE | `tests/cafeteria-menu-scraper/` + `backend/api/menu_router.py` |
+| 21 | ~~NPC 말풍선 (메뉴)~~ | 지민 | DONE | 식단 스크래핑 → NPC 호비 상태메시지 + RAG 지식베이스 자동 연동 |
 | 22 | Phaser 스프라이트시트 애니메이션 | 은빈+지민 | TODO | 은빈: 걷기 스프라이트시트, 지민: Phaser 애니메이션 코드 |
 | 23 | ~~기존 React 캐릭터 컴포넌트 삭제~~ | 지민 | DONE | -1666줄 정리 |
 
@@ -103,6 +103,7 @@
 | 정형데이터 질의 | **TAG + RAG 하이브리드** | 단순 집계 → DB, 문서 → RAG |
 | 벡터 저장소 | **Supabase pgvector** | FAISS → pgvector 마이그레이션 완료 |
 | 검색 방식 | **하이브리드 (벡터+키워드)** | pgvector + tsvector → RRF 병합 (0.7:0.3) |
+| 식당 메뉴 | **GPT-4o Vision OCR** | 이미지 크롭(좌상단 1/4) → VLM → JSON 구조화 |
 | 응답 방식 | **SSE 스트리밍** | 토큰 단위 실시간 출력 |
 | 일괄 등록 | **Node.js 스크립트** | `scripts/bulk-register.js`, Secret key |
 | 캐릭터 이미지 | **Supabase Storage** | `characters/{email_prefix}/{direction}.png` |
@@ -150,3 +151,7 @@
 - [x] 하이브리드 검색 (pgvector + tsvector, RRF 알고리즘)
 - [x] SSE 스트리밍 응답 (토큰 단위 실시간 출력)
 - [x] PDF/DOCX 파일 업로드 지원 (pypdf + python-docx)
+- [x] 식당 메뉴 스크래핑 (키친인큐베이터 → GPT-4o Vision OCR → DB 저장)
+- [x] 메뉴 API (`/api/menu/today`, `/api/menu/weekly/latest`)
+- [x] TAG 라우팅 cafeteria_menu 의도 추가 ("오늘 점심 뭐야?" 직접 응답)
+- [x] 메뉴 스크래핑 시 NPC 호비 상태메시지 + RAG 지식베이스 자동 업데이트

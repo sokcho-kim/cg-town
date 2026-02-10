@@ -18,6 +18,7 @@ CLASSIFIER_PROMPT = ChatPromptTemplate.from_messages([
 - "department_count": 부서별 인원, 부서 구성 관련 질문
 - "employees_by_department": 특정 부서 직원 목록 (부서명 추출 필요)
 - "npc_list": NPC 목록 관련 질문
+- "cafeteria_menu": 식당 메뉴, 오늘 점심, 식단표, 밥 뭐 나오는지 관련 질문
 - "rag": 위 카테고리에 해당하지 않는 모든 질문 (회사 소개, 복리후생, 업무 프로세스, 입사 가이드 등)
 
 JSON 형식으로만 응답하세요:

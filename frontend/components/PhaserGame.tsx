@@ -165,24 +165,24 @@ class MainScene extends Phaser.Scene {
     this.player.setOrigin(0.5, 0.75)
     this.player.setDepth(this.gridY)
 
-    // 이름 텍스트
+    // 이름 텍스트 (발밑)
     this.playerNameText = this.add.text(
       this.player.x,
-      this.player.y - TILE_SIZE * 1.5,
+      this.player.y + TILE_SIZE * 0.5,
       this.myName,
       {
-        fontSize: '14px',
+        fontSize: '12px',
         color: '#ffffff',
         stroke: '#000000',
         strokeThickness: 3,
         align: 'center',
       }
     )
-    this.playerNameText.setOrigin(0.5, 1)
+    this.playerNameText.setOrigin(0.5, 0)
     this.playerNameText.setDepth(1000)
 
-    // 상태 메시지 말풍선 (Graphics + Text — 같은 위치에 놓고 상대좌표로 그림)
-    const bubbleY = this.player.y - TILE_SIZE * 1.5 - 18
+    // 상태 메시지 말풍선 (머리 위)
+    const bubbleY = this.player.y - TILE_SIZE * 1.5
     this.playerBubbleGfx = this.add.graphics()
     this.playerBubbleGfx.setPosition(this.player.x, bubbleY)
     this.playerBubbleGfx.setDepth(1001)
@@ -372,17 +372,17 @@ class MainScene extends Phaser.Scene {
         sprite.setDisplaySize(TILE_SIZE, TILE_SIZE * 2)
         sprite.setOrigin(0.5, 0.75)
 
-        const nameText = this.add.text(0, -TILE_SIZE * 1.5, user_info.name, {
-          fontSize: '14px',
+        const nameText = this.add.text(0, TILE_SIZE * 0.5, user_info.name, {
+          fontSize: '12px',
           color: '#ffffff',
           stroke: '#000000',
           strokeThickness: 3,
           align: 'center',
         })
-        nameText.setOrigin(0.5, 1)
+        nameText.setOrigin(0.5, 0)
 
         // 말풍선 (Graphics + Text — 같은 위치에 놓음)
-        const bY = -TILE_SIZE * 1.5 - 18
+        const bY = -TILE_SIZE * 1.5
         const bubbleGfx = this.add.graphics()
         bubbleGfx.setPosition(0, bY)
         const bubbleText = this.add.text(0, bY, remoteStatusMsg, {
@@ -604,8 +604,8 @@ class MainScene extends Phaser.Scene {
     this.isMoving = true
     const targetX = this.gridX * TILE_SIZE + TILE_SIZE / 2
     const targetY = this.gridY * TILE_SIZE + TILE_SIZE / 2
-    const nameY = targetY - TILE_SIZE * 1.5
-    const bubbleY = nameY - 18
+    const nameY = targetY + TILE_SIZE * 0.5
+    const bubbleY = targetY - TILE_SIZE * 1.5
 
     this.player.setTexture(this.getTextureKey(this.myEmailPrefix, this.direction))
 
@@ -646,8 +646,8 @@ class MainScene extends Phaser.Scene {
   private updatePlayerPosition() {
     const x = this.gridX * TILE_SIZE + TILE_SIZE / 2
     const y = this.gridY * TILE_SIZE + TILE_SIZE / 2
-    const nameY = y - TILE_SIZE * 1.5
-    const bubbleY = nameY - 18
+    const nameY = y + TILE_SIZE * 0.5
+    const bubbleY = y - TILE_SIZE * 1.5
 
     this.player.setPosition(x, y)
     this.player.setDepth(this.gridY)

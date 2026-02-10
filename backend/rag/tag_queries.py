@@ -91,9 +91,54 @@ async def get_npc_list() -> dict:
     return {"answer": answer}
 
 
+async def get_cafeteria_menu() -> dict:
+    """오늘 식당 메뉴 조회"""
+    from datetime import date
+
+    supabase = get_supabase_client()
+    DAY_MAP = {0: "월", 1: "화", 2: "수", 3: "목", 4: "금", 5: "토", 6: "일"}
+
+    try:
+        result = (
+            supabase.table("cafeteria_menus")
+            .select("menus, week_title, period")
+            .order("scraped_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+    except Exception:
+        return {"answer": "식단 정보 시스템이 아직 설정되지 않았습니다."}
+
+    if not result.data:
+        return {"answer": "아직 등록된 식단 정보가 없습니다. 담당자에게 문의해 주세요."}
+
+    today = DAY_MAP.get(date.today().weekday(), "")
+    menus = result.data[0].get("menus", {})
+    today_menu = menus.get(today)
+
+    if not today_menu:
+        answer = f"오늘({today}요일)은 식단 정보가 없습니다.\n\n"
+        answer += f"이번 주 식단 ({result.data[0].get('period', '')}):\n"
+        for day in ["월", "화", "수", "목", "금"]:
+            dm = menus.get(day, {})
+            items = dm.get("lunch", [])
+            answer += f"\n{day}요일: {', '.join(items) if items else '정보 없음'}"
+        return {"answer": answer}
+
+    items = today_menu.get("lunch", [])
+    answer = f"오늘({today}요일) 점심 메뉴입니다:\n"
+    for item in items:
+        answer += f"- {item}\n"
+    if today_menu.get("special"):
+        answer += f"\n특별 메뉴: {today_menu['special']}"
+
+    return {"answer": answer}
+
+
 TAG_QUERY_MAP = {
     "employee_count": get_employee_count,
     "department_count": get_department_count,
     "employees_by_department": get_employees_by_department,
     "npc_list": get_npc_list,
+    "cafeteria_menu": get_cafeteria_menu,
 }

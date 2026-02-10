@@ -9,6 +9,7 @@ load_dotenv()
 
 from api.router import router
 from api.npc_router import router as npc_router
+from api.menu_router import router as menu_router
 from ws.endpoint import router as ws_router
 
 # 로깅 설정
@@ -37,6 +38,9 @@ app.include_router(router)
 
 # NPC 채팅 라우터 등록
 app.include_router(npc_router)
+
+# 식당 메뉴 라우터 등록
+app.include_router(menu_router)
 
 # WebSocket 라우터 등록
 app.include_router(ws_router)
