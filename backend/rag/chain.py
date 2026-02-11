@@ -57,11 +57,11 @@ def _build_sources(retrieved_docs: list[dict], settings: dict) -> list[dict] | N
     ]
 
 
-async def query_rag(question: str, history: list[dict] | None = None) -> dict:
+async def query_rag(question: str, history: list[dict] | None = None, docs: list[dict] | None = None) -> dict:
     """RAG 파이프라인으로 질문에 답변 (동기, 전체 응답)"""
     settings = get_settings()
 
-    retrieved_docs = search_similar(query=question, k=settings["retrieval_k"])
+    retrieved_docs = docs if docs is not None else search_similar(query=question, k=settings["retrieval_k"])
 
     llm = ChatOpenAI(
         model=settings["chat_model"],
@@ -78,11 +78,11 @@ async def query_rag(question: str, history: list[dict] | None = None) -> dict:
     }
 
 
-async def query_rag_stream(question: str, history: list[dict] | None = None) -> AsyncGenerator[dict, None]:
+async def query_rag_stream(question: str, history: list[dict] | None = None, docs: list[dict] | None = None) -> AsyncGenerator[dict, None]:
     """RAG 파이프라인 스트리밍 응답 (SSE용)"""
     settings = get_settings()
 
-    retrieved_docs = search_similar(query=question, k=settings["retrieval_k"])
+    retrieved_docs = docs if docs is not None else search_similar(query=question, k=settings["retrieval_k"])
 
     llm = ChatOpenAI(
         model=settings["chat_model"],

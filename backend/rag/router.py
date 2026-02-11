@@ -8,6 +8,7 @@ from rag.config import OPENAI_API_KEY, get_settings
 from rag.db_query import query_db
 from rag.chain import query_rag, query_rag_stream
 from rag.web_search import query_web
+from rag.vector_store import search_similar
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def _keyword_precheck(question: str) -> dict | None:
 
 
 CLASSIFIER_SYSTEM = """당신은 질문을 분류하는 시스템입니다.
-사용자의 질문을 분석하여 "db", "rag", "web" 중 하나로 분류하세요.
+사용자의 질문을 분석하여 "db" 또는 "rag" 중 하나로 분류하세요.
 이전 대화 맥락이 있으면 참고하세요.
 
 "db" — 아래 테이블에서 조회할 수 있는 질문:
@@ -79,8 +80,11 @@ async def _classify(question: str, history: list[dict] | None = None) -> dict:
         return {"intent": "rag"}
 
 
+_RAG_SIMILARITY_THRESHOLD = 0.35
+
+
 async def classify_and_route(question: str, history: list[dict] | None = None) -> dict:
-    """질문을 분류하고 적절한 파이프라인으로 라우팅"""
+    """질문을 분류하고 적절한 파이프라인으로 라우팅 (DB → RAG → Web 폴백)"""
     pre = _keyword_precheck(question)
     if pre:
         return pre
@@ -93,18 +97,24 @@ async def classify_and_route(question: str, history: list[dict] | None = None) -
         result["route"] = "db"
         return result
 
-    if intent == "web":
-        result = await query_web(question)
-        result["route"] = "web"
+    # RAG: 문서 유사도 확인 후, 낮으면 웹 검색으로 폴백
+    settings = get_settings()
+    docs = search_similar(question, k=settings["retrieval_k"])
+    best_score = max((d.get("similarity", 0) for d in docs), default=0)
+
+    if docs and best_score >= _RAG_SIMILARITY_THRESHOLD:
+        result = await query_rag(question, history=history, docs=docs)
+        result["route"] = "rag"
         return result
 
-    result = await query_rag(question, history=history)
-    result["route"] = "rag"
+    logger.info(f"RAG 유사도 낮음 (best={best_score:.3f}), 웹 검색 폴백")
+    result = await query_web(question)
+    result["route"] = "web"
     return result
 
 
 async def classify_and_route_stream(question: str, history: list[dict] | None = None):
-    """스트리밍 라우팅: DB/Web은 즉시 반환, RAG는 스트리밍"""
+    """스트리밍 라우팅: DB → RAG → Web 폴백 체인"""
     pre = _keyword_precheck(question)
     if pre:
         yield {"type": "tag_result", "data": pre}
@@ -119,12 +129,18 @@ async def classify_and_route_stream(question: str, history: list[dict] | None = 
         yield {"type": "tag_result", "data": result}
         return
 
-    if intent == "web":
-        result = await query_web(question)
-        result["route"] = "web"
-        yield {"type": "tag_result", "data": result}
+    # RAG: 문서 유사도 확인 후, 낮으면 웹 검색으로 폴백
+    settings = get_settings()
+    docs = search_similar(question, k=settings["retrieval_k"])
+    best_score = max((d.get("similarity", 0) for d in docs), default=0)
+
+    if docs and best_score >= _RAG_SIMILARITY_THRESHOLD:
+        yield {"type": "route_info", "route": "rag"}
+        async for event in query_rag_stream(question, history=history, docs=docs):
+            yield event
         return
 
-    yield {"type": "route_info", "route": "rag"}
-    async for event in query_rag_stream(question, history=history):
-        yield event
+    logger.info(f"RAG 유사도 낮음 (best={best_score:.3f}), 웹 검색 폴백")
+    result = await query_web(question)
+    result["route"] = "web"
+    yield {"type": "tag_result", "data": result}
