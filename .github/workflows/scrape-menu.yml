@@ -2,8 +2,8 @@ name: Weekly Menu Scrape
 
 on:
   schedule:
-    # 매주 월요일 한국시간 09:00 (UTC 00:00)
-    - cron: '0 0 * * 1'
+    # 매주 월요일 한국시간 00:00 (UTC 일요일 15:00)
+    - cron: '0 15 * * 0'
   workflow_dispatch: # 수동 실행 가능
 
 jobs:

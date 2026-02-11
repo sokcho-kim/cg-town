@@ -1,0 +1,16 @@
+name: Daily NPC Status Refresh
+
+on:
+  schedule:
+    # 매일 한국시간 08:00 (UTC 23:00 전날)
+    - cron: '0 23 * * 0-4'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh NPC status to today's menu
+        run: |
+          curl -sf -X POST "${{ secrets.BACKEND_API_URL }}/api/menu/refresh-npc-status" \
+            -H "X-Scraper-Key: ${{ secrets.SCRAPER_SECRET_KEY }}"

@@ -99,6 +99,32 @@ async def get_today_menu():
     }
 
 
+@router.post("/refresh-npc-status")
+async def refresh_npc_status(
+    x_scraper_key: str | None = Header(None),
+):
+    """매일 호비의 status_message를 오늘 메뉴로 갱신"""
+    _verify_scraper_key(x_scraper_key)
+    supabase = get_supabase_admin()
+
+    result = (
+        supabase.table("cafeteria_menus")
+        .select("menus")
+        .order("scraped_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if not result.data:
+        return {"message": "No menu data found"}
+
+    menus = result.data[0].get("menus", {})
+    _update_npc_status(supabase, menus)
+
+    today_weekday = DAY_MAP.get(date.today().weekday())
+    return {"message": f"NPC status refreshed for {today_weekday}요일"}
+
+
 @router.get("/weekly/latest")
 async def get_latest_weekly_menu():
     """최신 주간 전체 메뉴 조회 (public)"""
