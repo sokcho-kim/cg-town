@@ -20,17 +20,19 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
         # 이메일 @ 앞부분을 캐릭터 폴더명으로 사용
         email_prefix = user.email.split("@")[0] if user.email else ""
 
-        # profiles 테이블에서 status_message 조회
+        # profiles 테이블에서 username, status_message 조회
+        profile_name = ""
         status_message = ""
         try:
             profile_result = (
                 supabase.table("profiles")
-                .select("status_message")
+                .select("username, status_message")
                 .eq("id", user.id)
                 .single()
                 .execute()
             )
             if profile_result.data:
+                profile_name = profile_result.data.get("username", "") or ""
                 status_message = profile_result.data.get("status_message", "") or ""
         except Exception as profile_err:
             logger.warning(f"Failed to fetch profile for {user.id}: {profile_err}")
@@ -39,7 +41,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
             "id": user.id,
             "email": user.email,
             "email_prefix": email_prefix,
-            "name": user_metadata.get("name", "Unknown"),
+            "name": profile_name or user_metadata.get("username") or user_metadata.get("name") or email_prefix or "Unknown",
             "status_message": status_message,
         }
         saved_position = user_metadata.get("last_position")
