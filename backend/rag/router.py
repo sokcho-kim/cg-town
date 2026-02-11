@@ -1,6 +1,7 @@
 """질문 의도 분류 (DB / RAG / Web 3단 라우팅)"""
 import json
 import logging
+import re
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from rag.config import OPENAI_API_KEY, get_settings
@@ -9,6 +10,21 @@ from rag.chain import query_rag, query_rag_stream
 from rag.web_search import query_web
 
 logger = logging.getLogger(__name__)
+
+# ── 키워드 프리체크 (LLM 호출 없이 즉시 응답) ──
+
+_WIFI_PATTERN = re.compile(r"와이파이|wifi|wi-fi|와이파이\s*비번|와이파이\s*비밀번호", re.IGNORECASE)
+
+def _keyword_precheck(question: str) -> dict | None:
+    """키워드 매칭으로 즉시 응답할 수 있는 질문 감지"""
+    if _WIFI_PATTERN.search(question):
+        return {
+            "answer": "와이파이 QR코드입니다! 카메라로 스캔해주세요 📱",
+            "image": "/images/wifi-qr.png",
+            "route": "keyword",
+        }
+    return None
+
 
 CLASSIFIER_SYSTEM = """당신은 질문을 분류하는 시스템입니다.
 사용자의 질문을 분석하여 "db" 또는 "rag" 중 하나로 분류하세요.
@@ -65,6 +81,10 @@ async def _classify(question: str, history: list[dict] | None = None) -> dict:
 
 async def classify_and_route(question: str, history: list[dict] | None = None) -> dict:
     """질문을 분류하고 적절한 파이프라인으로 라우팅"""
+    pre = _keyword_precheck(question)
+    if pre:
+        return pre
+
     c = await _classify(question, history)
     intent = c.get("intent", "rag")
 
@@ -85,6 +105,11 @@ async def classify_and_route(question: str, history: list[dict] | None = None) -
 
 async def classify_and_route_stream(question: str, history: list[dict] | None = None):
     """스트리밍 라우팅: DB/Web은 즉시 반환, RAG는 스트리밍"""
+    pre = _keyword_precheck(question)
+    if pre:
+        yield {"type": "tag_result", "data": pre}
+        return
+
     c = await _classify(question, history)
     intent = c.get("intent", "rag")
 

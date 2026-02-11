@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
+  image?: string
 }
 
 interface NpcChatProps {
@@ -106,9 +107,10 @@ export default function NpcChat({ npcName, onClose }: NpcChatProps) {
             if (event.type === 'tag_result' && event.data?.answer) {
               // TAG 경로 (직원수, 메뉴 등 즉시 응답)
               fullAnswer = event.data.answer
+              const image = event.data.image as string | undefined
               setMessages(prev => {
                 const updated = [...prev]
-                updated[updated.length - 1] = { role: 'assistant', content: fullAnswer }
+                updated[updated.length - 1] = { role: 'assistant', content: fullAnswer, ...(image && { image }) }
                 return updated
               })
             } else if (event.type === 'token' && (event.token || event.content)) {
@@ -241,6 +243,17 @@ export default function NpcChat({ npcName, onClose }: NpcChatProps) {
               }}
             >
               {msg.content || (isStreaming && i === messages.length - 1 ? '...' : '')}
+              {msg.image && (
+                <img
+                  src={msg.image}
+                  alt="QR코드"
+                  style={{
+                    marginTop: 8,
+                    maxWidth: '100%',
+                    borderRadius: 8,
+                  }}
+                />
+              )}
             </div>
           </div>
         ))}
