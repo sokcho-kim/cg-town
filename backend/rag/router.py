@@ -27,7 +27,7 @@ def _keyword_precheck(question: str) -> dict | None:
 
 
 CLASSIFIER_SYSTEM = """당신은 질문을 분류하는 시스템입니다.
-사용자의 질문을 분석하여 "db" 또는 "rag" 중 하나로 분류하세요.
+사용자의 질문을 분석하여 "db", "rag", "web" 중 하나로 분류하세요.
 이전 대화 맥락이 있으면 참고하세요.
 
 "db" — 아래 테이블에서 조회할 수 있는 질문:
