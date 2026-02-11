@@ -40,14 +40,12 @@ CLASSIFIER_SYSTEM = """당신은 질문을 분류하는 시스템입니다.
   - cafeteria_menus 테이블: 식당 메뉴, 점심, 식단표
     예: "오늘 점심 뭐야?", "내일 메뉴는?"
 
-"rag" — 회사 내부 문서에서 찾을 수 있는 질문 (회사 소개, 복리후생, 업무 프로세스, 입사 가이드 등)
-
-"web" — DB에도 없고 회사 문서에도 없을 것 같은 질문 (일반 상식, 시사, 날씨, 외부 정보 등)
+"rag" — 위 DB에 해당하지 않는 모든 질문 (회사 문서, 일반 질문 등)
 
 중요: 특정 사람 이름이 언급되면 무조건 "db"로 분류하세요.
 
 JSON 형식으로만 응답:
-{{"intent": "db 또는 rag 또는 web", "table": "profiles 또는 cafeteria_menus(db일 때)", "filters": {{"position": "값", "department": "값", "username": "값", "day": "월/화/수/목/금/내일/모레"}}}}
+{{"intent": "db 또는 rag", "table": "profiles 또는 cafeteria_menus(db일 때)", "filters": {{"position": "값", "department": "값", "username": "값", "day": "월/화/수/목/금/내일/모레"}}}}
 filters에는 질문에서 추출한 조건만 넣으세요. 사용자 표현을 DB 값으로 변환해서 넣으세요. 없으면 빈 객체 {{}}."""
 
 
