@@ -96,19 +96,27 @@ async def classify_and_route(question: str, history: list[dict] | None = None) -
         return result
 
     # RAG: 문서 유사도 확인 후, 낮으면 웹 검색으로 폴백
-    settings = get_settings()
-    docs = search_similar(question, k=settings["retrieval_k"])
-    best_score = max((d.get("similarity", 0) for d in docs), default=0)
+    try:
+        settings = get_settings()
+        docs = search_similar(question, k=settings["retrieval_k"])
+        best_score = max((d.get("similarity", 0) for d in docs), default=0)
 
-    if docs and best_score >= _RAG_SIMILARITY_THRESHOLD:
-        result = await query_rag(question, history=history, docs=docs)
-        result["route"] = "rag"
+        if docs and best_score >= _RAG_SIMILARITY_THRESHOLD:
+            result = await query_rag(question, history=history, docs=docs)
+            result["route"] = "rag"
+            return result
+
+        logger.info(f"RAG 유사도 낮음 (best={best_score:.3f}), 웹 검색 폴백")
+    except Exception as e:
+        logger.warning(f"RAG 검색 실패, 웹 검색 폴백: {e}")
+
+    try:
+        result = await query_web(question)
+        result["route"] = "web"
         return result
-
-    logger.info(f"RAG 유사도 낮음 (best={best_score:.3f}), 웹 검색 폴백")
-    result = await query_web(question)
-    result["route"] = "web"
-    return result
+    except Exception as e:
+        logger.warning(f"웹 검색도 실패: {e}")
+        return {"answer": "죄송합니다, 지금은 답변을 찾을 수 없어요. 잠시 후 다시 시도해 주세요.", "route": "error"}
 
 
 async def classify_and_route_stream(question: str, history: list[dict] | None = None):
@@ -128,17 +136,25 @@ async def classify_and_route_stream(question: str, history: list[dict] | None = 
         return
 
     # RAG: 문서 유사도 확인 후, 낮으면 웹 검색으로 폴백
-    settings = get_settings()
-    docs = search_similar(question, k=settings["retrieval_k"])
-    best_score = max((d.get("similarity", 0) for d in docs), default=0)
+    try:
+        settings = get_settings()
+        docs = search_similar(question, k=settings["retrieval_k"])
+        best_score = max((d.get("similarity", 0) for d in docs), default=0)
 
-    if docs and best_score >= _RAG_SIMILARITY_THRESHOLD:
-        yield {"type": "route_info", "route": "rag"}
-        async for event in query_rag_stream(question, history=history, docs=docs):
-            yield event
-        return
+        if docs and best_score >= _RAG_SIMILARITY_THRESHOLD:
+            yield {"type": "route_info", "route": "rag"}
+            async for event in query_rag_stream(question, history=history, docs=docs):
+                yield event
+            return
 
-    logger.info(f"RAG 유사도 낮음 (best={best_score:.3f}), 웹 검색 폴백")
-    result = await query_web(question)
-    result["route"] = "web"
-    yield {"type": "tag_result", "data": result}
+        logger.info(f"RAG 유사도 낮음 (best={best_score:.3f}), 웹 검색 폴백")
+    except Exception as e:
+        logger.warning(f"RAG 검색 실패, 웹 검색 폴백: {e}")
+
+    try:
+        result = await query_web(question)
+        result["route"] = "web"
+        yield {"type": "tag_result", "data": result}
+    except Exception as e:
+        logger.warning(f"웹 검색도 실패: {e}")
+        yield {"type": "tag_result", "data": {"answer": "죄송합니다, 지금은 답변을 찾을 수 없어요. 잠시 후 다시 시도해 주세요.", "route": "error"}}
