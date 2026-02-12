@@ -1,6 +1,6 @@
-# CG Town 셋업 가이드 (은빈님용)
+# CG Town 셋업 가이드
 
-> 이 문서는 직원 등록, 캐릭터 이미지 업로드, DB 설정을 위한 가이드입니다.
+> 이 문서는 초기 DB 설정, 사원 등록, 캐릭터 이미지 업로드를 위한 가이드입니다.
 
 ---
 
@@ -18,42 +18,42 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS status_message text DEFAULT '';
 
 ---
 
-## 2단계: 직원 CSV 작성
+## 2단계: RLS 보안 정책 (1회만)
 
-`scripts/users.csv` 파일을 편집합니다.
+아래 테이블에 RLS를 활성화합니다:
 
-```csv
-username,email,department,position,is_npc
-조은빈,bin@ihopper.co.kr,디자인팀,사원,false
-김지민,jimin@ihopper.co.kr,개발팀,사원,false
-박선춘,psc@ihopper.co.kr,경영지원,대표,false
-CG봇,npc_cg@ihopper.co.kr,CG Town,NPC,true
-홍길동,gildong@ihopper.co.kr,개발팀,사원,false
+```sql
+ALTER TABLE public.knowledge_base ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "authenticated can read" ON public.knowledge_base
+  FOR SELECT TO authenticated USING (true);
+
+ALTER TABLE public.cafeteria_menus ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "authenticated can read" ON public.cafeteria_menus
+  FOR SELECT TO authenticated USING (true);
+
+ALTER TABLE public.meeting_reservations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "authenticated can read" ON public.meeting_reservations
+  FOR SELECT TO authenticated USING (true);
 ```
 
-| 컬럼 | 설명 | 예시 |
-|------|------|------|
-| username | 이름 | 조은빈 |
-| email | 로그인 이메일 (고유) | bin@ihopper.co.kr |
-| department | 부서 | 디자인팀 |
-| position | 직급 | 사원, 팀장, 이사, 대표 |
-| is_npc | NPC 여부 | false (일반 직원), true (NPC) |
+> 인증된 유저만 읽기 가능, 쓰기/삭제는 백엔드 service role key만 가능
 
 ---
 
-## 3단계: 일괄 등록 실행
+## 3단계: 사원 등록 (관리자 웹 UI)
 
-터미널에서:
+관리자 계정으로 로그인 후 `/admin/members` 페이지에서 사원을 등록합니다.
 
-```bash
-cd scripts
-npm install        # 최초 1회만
-node bulk-register.js
-```
+1. **+ 신규 사원 등록** 버튼 클릭
+2. 이름, 이메일, 부서, 직급 입력
+3. **등록** 클릭 → 초기 비밀번호 `CgTown2026!`로 계정 생성
 
-- 기본 비밀번호: `CgTown2026!` (로그인 후 각자 변경)
-- 이미 등록된 이메일은 건너뛰고 프로필 정보만 업데이트됩니다
-- 결과가 터미널에 표시됩니다
+기능:
+- 사원 등록/수정/삭제
+- 비밀번호 초기화
+- 부서별 그룹 조회
+
+> 관리자 권한 부여: Supabase에서 `profiles` 테이블의 `is_admin`을 `true`로 설정
 
 ---
 
@@ -83,9 +83,7 @@ Supabase Dashboard > **Storage** > `characters` 버킷에서:
 | 직원 | 이메일 | 폴더명 | 업로드 경로 |
 |------|--------|--------|-------------|
 | 조은빈 | bin@ihopper.co.kr | `bin` | `characters/bin/front.png` 등 |
-| 김지민 | jimin@ihopper.co.kr | `jimin` | `characters/jimin/front.png` 등 |
-| 박선춘 | psc@ihopper.co.kr | `psc` | `characters/psc/front.png` 등 |
-| CG봇 | npc_cg@ihopper.co.kr | `npc_cg` | `characters/npc_cg/front.png` 등 |
+| 호비 | npc_cg@ihopper.co.kr | `npc_cg` | `characters/npc_cg/front.png` 등 |
 
 > 폴더명 = 이메일에서 `@` 앞부분. 코드에서 자동으로 URL을 조합합니다.
 
@@ -107,7 +105,7 @@ backend/data/migration_pgvector.sql
 - `match_knowledge_chunks` RPC 함수 — pgvector 유사도 검색
 - HNSW 인덱스, RLS 정책, updated_at 트리거
 
-> 실행 후 `/admin/rag-test` 페이지에서 문서 업로드 및 RAG 테스트 가능
+> 실행 후 `/admin/hop-e` 페이지에서 문서 업로드 및 RAG 테스트 가능
 
 ---
 
@@ -127,16 +125,14 @@ backend/data/migration_hybrid_search.sql
 - 자동 tsvector 갱신 트리거
 - `match_knowledge_hybrid` RPC 함수 — RRF 알고리즘으로 벡터+키워드 결과 병합
 
-> 기존 청크에도 자동으로 tsvector가 생성됩니다 (트리거 + UPDATE SET)
-
 ---
 
 ## 작업 순서 요약
 
 ```
 1. SQL 실행 (DB 컬럼 추가)
-2. users.csv 작성 (30명 정보)
-3. node bulk-register.js (계정 일괄 생성)
+2. RLS 보안 정책 적용
+3. 관리자 웹 UI로 사원 등록 (/admin/members)
 4. 피그마에서 캐릭터 Export → Supabase Storage 업로드
 5. pgvector 마이그레이션 SQL 실행 (RAG 지식베이스)
 6. 하이브리드 검색 마이그레이션 SQL 실행 (tsvector)
@@ -149,6 +145,7 @@ backend/data/migration_hybrid_search.sql
 | 증상 | 원인 | 해결 |
 |------|------|------|
 | `SUPABASE_SECRET_KEY is not set` | 환경변수 누락 | `backend/.env`에 Secret key 확인 |
-| `User already registered` | 이미 등록된 이메일 | 정상 — SKIP 후 프로필만 업데이트됨 |
+| 관리자 페이지 접근 불가 | is_admin 미설정 | Supabase에서 해당 유저의 `is_admin`을 `true`로 |
 | 캐릭터 이미지 안 보임 | 폴더명 불일치 | 이메일 `@` 앞부분과 Storage 폴더명 일치 확인 |
 | 로그인 안 됨 | 비밀번호 오류 | 기본 비밀번호: `CgTown2026!` |
+| 관리자가 다른 사원 수정 안 됨 | RLS 정책 | `/dogam/edit?id=` 사용 시 자동으로 admin API 경유 |

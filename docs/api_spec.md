@@ -118,6 +118,53 @@ NPC에게 질문 (SSE 스트리밍 응답)
 
 ---
 
+### 관리자 (인증 + is_admin 필요)
+
+#### GET /api/admin/users
+전체 사원 목록 (NPC 제외, 부서별 정렬)
+
+#### POST /api/admin/users
+신규 사원 등록 (Supabase Auth 계정 생성 + 프로필)
+
+**Request**
+```json
+{
+  "email": "user@ihopper.co.kr",
+  "username": "홍길동",
+  "department": "서비스개발",
+  "position": "사원",
+  "status_message": ""
+}
+```
+
+**Response**
+```json
+{
+  "message": "홍길동님이 등록되었습니다.",
+  "user_id": "uuid",
+  "default_password": "CgTown2026!"
+}
+```
+
+#### PUT /api/admin/users/{user_id}
+사원 정보 수정 (변경 필드만 전송)
+
+**Request** (변경된 필드만)
+```json
+{
+  "department": "AI",
+  "position": "팀장"
+}
+```
+
+#### POST /api/admin/users/{user_id}/reset-password
+비밀번호 초기화 (`CgTown2026!`)
+
+#### DELETE /api/admin/users/{user_id}
+사원 삭제 (Auth + Profile, 자기 자신 삭제 방지)
+
+---
+
 ### WebSocket
 
 #### WS /ws?token={jwt_token}

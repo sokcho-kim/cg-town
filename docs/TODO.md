@@ -1,6 +1,6 @@
 # CG Town 작업 목록
 
-> 최종 업데이트: 2026-02-10
+> 최종 업데이트: 2026-02-12
 
 ---
 
@@ -28,8 +28,8 @@
 | # | 작업 | 담당 | 상태 | 비고 |
 |---|------|------|------|------|
 | 3 | ~~로그아웃 기능~~ | 지민 | DONE | 게임 + 도감 페이지 |
-| 4 | ~~관리자 일괄 등록 스크립트~~ | 지민 | DONE | `scripts/bulk-register.js` |
-| 4b | ~~CSV 작성 + 일괄 등록 실행~~ | 지민 | DONE | 28명 등록 완료, 아바타 동물 상태메시지 부여 |
+| 4 | ~~관리자 사원 관리 페이지~~ | 지민 | DONE | `/admin/members` 웹 UI (등록/수정/삭제/비번초기화) |
+| 4b | ~~28명 사원 등록~~ | 지민 | DONE | 관리자 UI로 등록, 벌크 스크립트 삭제됨 |
 | 4c | ~~캐릭터 이미지 Storage 업로드~~ | 지민 | DONE | Gemini 이미지 분류/리사이즈(128x256) → Supabase Storage 업로드 |
 | 4d | ~~캐릭터 비율 수정~~ | 지민 | DONE | 128×256 → 64×128 (1:2 비율 유지), 텍스트 오프셋 조정 완료 |
 | 5 | ~~캐릭터 머리 위 상태 텍스트~~ | 지민 | DONE | `status_message` 컬럼 + Phaser 표시 |
@@ -52,7 +52,9 @@
 | # | 작업 | 담당 | 상태 | 비고 |
 |---|------|------|------|------|
 | 12 | ~~NPC 관리 방식 결정~~ | 지민 | DONE | `is_npc` 플래그 |
-| 13 | 지식베이스 구축 + RAG | 지민 | 진행중 | pgvector + 하이브리드 검색 + SSE 스트리밍 완료, 문서 확장 남음 |
+| 13 | ~~지식베이스 구축 + RAG~~ | 지민 | DONE | pgvector + 하이브리드 검색 + SSE 스트리밍 + 에이전트화 완료 |
+| 13h | ~~호비 에이전트화~~ | 지민 | DONE | Plugin 기반 Tool 아키텍처 (`backend/agent/` + `backend/hobi/`) |
+| 13i | ~~NPC 상태메시지 자동갱신~~ | 지민 | DONE | 매일 06:00 KST 오늘 메뉴로 상태메시지 업데이트 |
 | 13a | ~~Supabase에 pgvector 마이그레이션 SQL 실행~~ | 지민 | DONE | `backend/data/migration_pgvector.sql` 실행 완료 |
 | 13b | ~~기존 로컬 지식베이스 문서 DB로 마이그레이션~~ | 지민 | DONE | 4개 문서 → 7개 청크 이관 완료 |
 | 13c | ~~RAG 파이프라인 동작 테스트~~ | 지민 | DONE | RAG/TAG 라우팅 + 질의응답 E2E 검증 완료 |
@@ -105,7 +107,7 @@
 | 검색 방식 | **하이브리드 (벡터+키워드)** | pgvector + tsvector → RRF 병합 (0.7:0.3) |
 | 식당 메뉴 | **GPT-4o Vision OCR** | 이미지 크롭(좌상단 1/4) → VLM → JSON 구조화 |
 | 응답 방식 | **SSE 스트리밍** | 토큰 단위 실시간 출력 |
-| 일괄 등록 | **Node.js 스크립트** | `scripts/bulk-register.js`, Secret key |
+| 사원 관리 | **관리자 웹 UI** | `/admin/members`, 벌크 스크립트 삭제됨 |
 | 캐릭터 이미지 | **Supabase Storage** | `characters/{email_prefix}/{direction}.png` |
 | 작업 분리 | **에셋 vs 코드** | 은빈: .png/.json 에셋만, 지민: 코드만 → git 충돌 최소화 |
 
@@ -129,7 +131,7 @@
 - [x] DB 스키마 확장 (tech_stack, field, project, tmi)
 - [x] 에셋팩 추가 (Sprout Lands, Forest)
 - [x] 로그아웃 기능 (게임 + 도감)
-- [x] 일괄 등록 스크립트 (scripts/bulk-register.js)
+- [x] 사원 관리 웹 UI (/admin/members)
 - [x] DB 스키마: position, is_npc, status_message 추가
 - [x] 상태 메시지 표시 (Phaser 머리 위 + 도감)
 - [x] 도감 부서별 필터 + NPC 탭
@@ -155,3 +157,10 @@
 - [x] 메뉴 API (`/api/menu/today`, `/api/menu/weekly/latest`)
 - [x] TAG 라우팅 cafeteria_menu 의도 추가 ("오늘 점심 뭐야?" 직접 응답)
 - [x] 메뉴 스크래핑 시 NPC 호비 상태메시지 + RAG 지식베이스 자동 업데이트
+- [x] 호비 에이전트화 — Plugin 기반 Tool 아키텍처 (agent 코어 라이브러리 + hobi 패키지)
+- [x] NPC 상태메시지 자동갱신 (매일 06:00 KST 오늘 메뉴)
+- [x] 관리자 사원 관리 페이지 (`/admin/members` — 등록/수정/삭제/비번초기화)
+- [x] 벌크 스크립트 삭제 + 미사용 파일 정리 (~320MB 절약)
+- [x] 데이터 안전 버그 수정 (프로필 편집 덮어쓰기, 임베딩 삭제 순서, 문서 삭제 방식)
+- [x] RLS 보안 정책 적용 (knowledge_base, cafeteria_menus, meeting_reservations)
+- [x] 관리자 도감 편집 RLS 우회 (admin API 경유)
