@@ -328,19 +328,24 @@ async def update_document(filename: str, body: DocumentRequest, current_user=Dep
 
 @router.delete("/documents/{filename}")
 async def delete_document(filename: str, current_user=Depends(get_current_user)):
-    """문서 삭제 (연결된 청크도 cascade 삭제)"""
+    """문서 삭제 (연결된 청크도 명시적 삭제)"""
     supabase = get_supabase_admin()
 
     existing = (
         supabase.table("knowledge_documents")
         .select("id")
         .eq("filename", filename)
+        .limit(1)
         .execute()
     )
     if not existing.data:
         raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
 
-    supabase.table("knowledge_documents").delete().eq("filename", filename).execute()
+    doc_id = existing.data[0]["id"]
+
+    # 청크 먼저 삭제 → 문서 삭제 (ID 기준, 동명 문서 보호)
+    supabase.table("knowledge_chunks").delete().eq("document_id", doc_id).execute()
+    supabase.table("knowledge_documents").delete().eq("id", doc_id).execute()
 
     total = get_total_chunks()
     return {

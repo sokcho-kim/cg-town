@@ -42,6 +42,15 @@ function DogamEditContent() {
   const [techStack, setTechStack] = useState<string[]>([])
   const [statusMessage, setStatusMessage] = useState('')
 
+  // 원본 값 (변경 감지용)
+  const [original, setOriginal] = useState<{
+    field: string
+    project: string
+    tmi: string
+    tech_stack: string[]
+    status_message: string
+  } | null>(null)
+
   useEffect(() => {
     async function fetchProfile() {
       const supabase = createClient()
@@ -73,14 +82,22 @@ function DogamEditContent() {
       if (data) {
         setProfile(data)
         setField(data.field || '')
-        if (data.project && typeof data.project === 'string') {
-          setProjects(data.project.split(', ').filter(Boolean))
-        } else {
-          setProjects([])
-        }
+        const parsedProjects = (data.project && typeof data.project === 'string')
+          ? data.project.split(', ').filter(Boolean)
+          : []
+        setProjects(parsedProjects)
         setTmi(data.tmi || '')
         setTechStack(data.tech_stack || [])
         setStatusMessage(data.status_message || '')
+
+        // 원본 스냅샷 저장 — 저장 시 변경된 필드만 UPDATE
+        setOriginal({
+          field: data.field || '',
+          project: parsedProjects.join(', '),
+          tmi: data.tmi || '',
+          tech_stack: data.tech_stack || [],
+          status_message: data.status_message || '',
+        })
       }
       setLoading(false)
     }
@@ -88,19 +105,29 @@ function DogamEditContent() {
   }, [router, targetId])
 
   const handleSave = async () => {
-    if (!profile) return
+    if (!profile || !original) return
     setSaving(true)
+
+    // 변경된 필드만 수집 — 안 바꾼 필드는 건드리지 않음
+    const updates: Record<string, unknown> = {}
+    const projectStr = projects.join(', ')
+
+    if (field !== original.field) updates.field = field
+    if (projectStr !== original.project) updates.project = projectStr
+    if (tmi !== original.tmi) updates.tmi = tmi
+    if (JSON.stringify(techStack) !== JSON.stringify(original.tech_stack)) updates.tech_stack = techStack
+    if (statusMessage !== original.status_message) updates.status_message = statusMessage
+
+    if (Object.keys(updates).length === 0) {
+      setSaving(false)
+      router.push(`/dogam/${profile.id}`)
+      return
+    }
 
     const supabase = createClient()
     const { error } = await supabase
       .from('profiles')
-      .update({
-        field,
-        project: projects.join(', '),
-        tmi,
-        tech_stack: techStack,
-        status_message: statusMessage,
-      })
+      .update(updates)
       .eq('id', profile.id)
 
     if (error) {

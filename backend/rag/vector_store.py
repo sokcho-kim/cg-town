@@ -9,23 +9,33 @@ logger = logging.getLogger(__name__)
 
 
 def embed_and_store_document(document_id: str, filename: str, content: str) -> int:
-    """문서를 청크로 분할하고, 임베딩 생성 후 DB에 저장. 청크 수 반환."""
+    """문서를 청크로 분할하고, 임베딩 생성 후 DB에 저장. 청크 수 반환.
+
+    안전 전략: 새 임베딩을 먼저 생성한 뒤, 성공 시에만 기존 청크를 삭제하고 교체.
+    임베딩 생성 실패 시 기존 데이터가 보존된다.
+    """
     supabase = get_supabase_admin()
     embeddings = get_embeddings()
-
-    # 기존 청크 삭제
-    supabase.table("knowledge_chunks").delete().eq("document_id", document_id).execute()
 
     # 청크 분할
     chunks = chunk_text(content, filename)
     if not chunks:
+        # 내용이 비었으면 기존 청크만 삭제
+        supabase.table("knowledge_chunks").delete().eq("document_id", document_id).execute()
         return 0
 
-    # 임베딩 생성 (배치)
+    # 임베딩 생성 (실패하면 기존 청크 보존)
     texts = [c["content"] for c in chunks]
-    vectors = embeddings.embed_documents(texts)
+    try:
+        vectors = embeddings.embed_documents(texts)
+    except Exception as e:
+        logger.error(f"'{filename}' 임베딩 생성 실패 — 기존 청크 보존: {e}")
+        raise
 
-    # DB 저장
+    if len(vectors) != len(chunks):
+        logger.error(f"'{filename}' 임베딩 수 불일치: chunks={len(chunks)}, vectors={len(vectors)}")
+        raise ValueError(f"임베딩 수 불일치: {len(chunks)} != {len(vectors)}")
+
     rows = [
         {
             "document_id": document_id,
@@ -36,7 +46,9 @@ def embed_and_store_document(document_id: str, filename: str, content: str) -> i
         for chunk, vector in zip(chunks, vectors)
     ]
 
-    # 배치 삽입 (100개씩)
+    # 새 임베딩 생성 성공 → 기존 청크 삭제 후 교체
+    supabase.table("knowledge_chunks").delete().eq("document_id", document_id).execute()
+
     for i in range(0, len(rows), 100):
         batch = rows[i : i + 100]
         supabase.table("knowledge_chunks").insert(batch).execute()
