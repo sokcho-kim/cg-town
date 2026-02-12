@@ -35,6 +35,15 @@ export default function AdminMembersPage() {
   })
   const [submitting, setSubmitting] = useState(false)
 
+  // 수정 모드
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({
+    username: '',
+    department: '',
+    position: '',
+    status_message: '',
+  })
+
   useEffect(() => {
     checkAdminAndFetch()
   }, [])
@@ -108,6 +117,41 @@ export default function AdminMembersPage() {
       await fetchUsers()
     } catch (err) {
       alert(`삭제 실패: ${err}`)
+    }
+  }
+
+  function startEdit(user: User) {
+    setEditingId(user.id)
+    setEditForm({
+      username: user.username || '',
+      department: user.department || '',
+      position: user.position || '',
+      status_message: user.status_message || '',
+    })
+  }
+
+  async function handleUpdate(user: User) {
+    // 변경된 필드만 전송
+    const changes: Record<string, string> = {}
+    if (editForm.username !== (user.username || '')) changes.username = editForm.username
+    if (editForm.department !== (user.department || '')) changes.department = editForm.department
+    if (editForm.position !== (user.position || '')) changes.position = editForm.position
+    if (editForm.status_message !== (user.status_message || '')) changes.status_message = editForm.status_message
+
+    if (Object.keys(changes).length === 0) {
+      setEditingId(null)
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      await api.put(`/api/admin/users/${user.id}`, changes)
+      setEditingId(null)
+      await fetchUsers()
+    } catch (err) {
+      alert(`수정 실패: ${err}`)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -243,40 +287,116 @@ export default function AdminMembersPage() {
               {members.map((user, i) => (
                 <div
                   key={user.id}
-                  className={`flex items-center justify-between px-4 py-3 ${
+                  className={`px-4 py-3 ${
                     i < members.length - 1 ? 'border-b border-gray-100' : ''
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">{user.username}</span>
-                      {user.position && (
-                        <span className="text-xs text-gray-400 ml-2">{user.position}</span>
-                      )}
-                      {user.is_admin && (
-                        <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded ml-2">관리자</span>
-                      )}
+                  {editingId === user.id ? (
+                    /* 수정 모드 */
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">이름</label>
+                          <input
+                            type="text"
+                            value={editForm.username}
+                            onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:border-[#E8852C] focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">부서</label>
+                          <select
+                            value={editForm.department}
+                            onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:border-[#E8852C] focus:outline-none"
+                          >
+                            {DEPARTMENTS.map((d) => (
+                              <option key={d} value={d}>{d}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">직급</label>
+                          <select
+                            value={editForm.position}
+                            onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:border-[#E8852C] focus:outline-none"
+                          >
+                            <option value="">선택</option>
+                            {POSITIONS.map((p) => (
+                              <option key={p} value={p}>{p}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">상태 메시지</label>
+                          <input
+                            type="text"
+                            value={editForm.status_message}
+                            onChange={(e) => setEditForm({ ...editForm, status_message: e.target.value })}
+                            maxLength={30}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:border-[#E8852C] focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="px-3 py-1 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                        >
+                          취소
+                        </button>
+                        <button
+                          onClick={() => handleUpdate(user)}
+                          disabled={submitting}
+                          className="px-3 py-1 text-xs text-white bg-[#E8852C] rounded hover:bg-[#D4741F] disabled:opacity-50"
+                        >
+                          {submitting ? '저장 중...' : '저장'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {user.status_message && (
-                      <span className="text-xs text-gray-400 max-w-[150px] truncate">
-                        {user.status_message}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => handleResetPassword(user)}
-                      className="text-xs text-blue-500 hover:text-blue-700"
-                    >
-                      비번초기화
-                    </button>
-                    <button
-                      onClick={() => handleDelete(user)}
-                      className="text-xs text-red-400 hover:text-red-600"
-                    >
-                      삭제
-                    </button>
-                  </div>
+                  ) : (
+                    /* 보기 모드 */
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">{user.username}</span>
+                          {user.position && (
+                            <span className="text-xs text-gray-400 ml-2">{user.position}</span>
+                          )}
+                          {user.is_admin && (
+                            <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded ml-2">관리자</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {user.status_message && (
+                          <span className="text-xs text-gray-400 max-w-[150px] truncate">
+                            {user.status_message}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => startEdit(user)}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          수정
+                        </button>
+                        <button
+                          onClick={() => handleResetPassword(user)}
+                          className="text-xs text-blue-500 hover:text-blue-700"
+                        >
+                          비번초기화
+                        </button>
+                        <button
+                          onClick={() => handleDelete(user)}
+                          className="text-xs text-red-400 hover:text-red-600"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
