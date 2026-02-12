@@ -188,7 +188,9 @@ async function main() {
       console.log(`  [SKIP] ${email} (${username}) -- already registered`);
 
       // Still update the profile in case new columns were added.
-      // Find the user ID by looking up the email in the existing user list.
+      // NOTE: status_message is NOT overwritten for existing users — users
+      // may have customised it via the app.  Only username, department,
+      // position and is_npc (structural fields) are synced from the CSV.
       let userId = null;
       let page = 1;
       while (!userId) {
@@ -212,7 +214,7 @@ async function main() {
           department,
           position,
           isNpc,
-          statusMessage,
+          statusMessage: null,  // don't overwrite existing status_message
         });
         if (result?.success) {
           console.log(`         -> profile updated (department, position, is_npc)`);

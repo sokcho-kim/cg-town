@@ -26,4 +26,5 @@ username,email,department,position,is_npc,status_message
 도현승,dohs@ihopper.co.kr,서비스개발,,false,🐦 도요새
 이태림,xofla1012@ihopper.co.kr,서비스개발,,false,🦁 사자
 정재동,gendhi52@ihopper.co.kr,서비스개발,,false,🐯 호랑이
-CG봇,npc_cg@ihopper.co.kr,CG Town,NPC,true,🤖 호비
+오창석,kcoco@ihopper.co.kr,AI,대리,false,🐿️ 마멋
+호비,npc_cg@ihopper.co.kr,CG Town,NPC,true,🤖 호비

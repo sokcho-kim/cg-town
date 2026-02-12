@@ -1,4 +1,4 @@
-"""NPC 채팅 API 엔드포인트 (pgvector + 하이브리드 검색 + SSE 스트리밍)"""
+"""NPC 채팅 API 엔드포인트 (에이전트 기반 + SSE 스트리밍)"""
 import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from api.deps import get_current_user
 from lib.supabase import get_supabase_admin
-from rag.router import classify_and_route, classify_and_route_stream
+from hobi.agent import get_hobi_agent, reset_agent
 from rag.vector_store import embed_and_store_document, rebuild_all_embeddings, get_total_chunks
 from rag.config import get_settings, save_settings
 
@@ -91,7 +91,7 @@ def _save_message(user_id: str, role: str, content: str):
 
 @router.post("/chat", response_model=ChatResponse)
 async def npc_chat(body: ChatRequest, current_user=Depends(get_current_user)):
-    """NPC에게 질문하기"""
+    """NPC에게 질문하기 (에이전트 기반)"""
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="메시지를 입력해 주세요.")
 
@@ -101,22 +101,23 @@ async def npc_chat(body: ChatRequest, current_user=Depends(get_current_user)):
     # 유저 메시지 저장
     _save_message(user_id, "user", body.message)
 
-    result = await classify_and_route(body.message, history=history)
+    agent = get_hobi_agent()
+    result = await agent.run(body.message, history=history)
 
     # 어시스턴트 응답 저장
     _save_message(user_id, "assistant", result["answer"])
 
     return ChatResponse(
         answer=result["answer"],
-        route=result.get("route", "rag"),
-        intent=result.get("intent", "unknown"),
+        route=result.get("route", "llm"),
+        intent=result.get("route", "unknown"),
         sources=result.get("sources"),
     )
 
 
 @router.post("/chat/stream")
 async def npc_chat_stream(body: ChatRequest, current_user=Depends(get_current_user)):
-    """NPC에게 질문하기 (SSE 스트리밍)"""
+    """NPC에게 질문하기 (에이전트 SSE 스트리밍)"""
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="메시지를 입력해 주세요.")
 
@@ -129,14 +130,20 @@ async def npc_chat_stream(body: ChatRequest, current_user=Depends(get_current_us
     full_answer_parts: list[str] = []
 
     async def event_generator():
-        async for event in classify_and_route_stream(body.message, history=history):
-            # 응답 토큰 수집 (저장용)
-            if event.get("type") == "token" and event.get("content"):
-                full_answer_parts.append(event["content"])
-            elif event.get("type") == "tag_result" and event.get("data", {}).get("answer"):
-                full_answer_parts.append(event["data"]["answer"])
+        agent = get_hobi_agent()
+        async for event in agent.run_stream(body.message, history=history):
+            # StreamEvent → 프론트엔드 SSE 형식 변환
+            sse_data = _stream_event_to_sse(event)
 
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            # 응답 토큰 수집 (저장용)
+            if event.type == "token" and event.data:
+                full_answer_parts.append(event.data)
+            elif event.type == "tag_result" and isinstance(event.data, dict):
+                answer = event.data.get("answer", "")
+                if answer:
+                    full_answer_parts.append(answer)
+
+            yield f"data: {json.dumps(sse_data, ensure_ascii=False)}\n\n"
 
         # 스트리밍 완료 후 어시스턴트 응답 DB 저장
         full_answer = "".join(full_answer_parts)
@@ -148,6 +155,33 @@ async def npc_chat_stream(body: ChatRequest, current_user=Depends(get_current_us
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def _stream_event_to_sse(event) -> dict:
+    """StreamEvent → 프론트엔드 호환 SSE dict 변환.
+
+    기존 프론트엔드가 기대하는 형식:
+      token:      {"type": "token", "content": "..."}
+      sources:    {"type": "sources", "sources": [...]}
+      route_info: {"type": "route_info", "route": "..."}
+      tag_result: {"type": "tag_result", "data": {...}}
+      done:       {"type": "done"}
+      error:      {"type": "error", "message": "..."}
+    """
+    if event.type == "token":
+        return {"type": "token", "content": event.data or ""}
+    elif event.type == "sources":
+        return {"type": "sources", "sources": event.data or []}
+    elif event.type == "route_info":
+        return {"type": "route_info", "route": event.data or ""}
+    elif event.type == "tag_result":
+        return {"type": "tag_result", "data": event.data or {}}
+    elif event.type == "done":
+        return {"type": "done"}
+    elif event.type == "error":
+        return {"type": "error", "message": str(event.data or "")}
+    else:
+        return {"type": event.type, "data": event.data}
 
 
 @router.delete("/chat/history")
@@ -174,6 +208,11 @@ async def update_npc_settings(body: SettingsRequest, current_user=Depends(get_cu
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     current.update(updates)
     save_settings(current)
+
+    # 모델이나 프롬프트 변경 시 에이전트 재생성
+    if any(k in updates for k in ("chat_model", "chat_temperature", "system_prompt")):
+        reset_agent()
+
     return current
 
 

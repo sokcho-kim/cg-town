@@ -160,18 +160,21 @@ def _update_npc_status(supabase, menus: dict):
             status = "오늘 메뉴 정보 없음"
 
     try:
+        # is_npc 플래그로 NPC를 찾음 (username 변경에 영향 안 받도록)
         npc = (
             supabase.table("profiles")
-            .select("id")
+            .select("id, username")
             .eq("is_npc", True)
-            .eq("username", "호비")
             .execute()
         )
         if npc.data:
-            supabase.table("profiles").update(
-                {"status_message": status}
-            ).eq("id", npc.data[0]["id"]).execute()
+            for row in npc.data:
+                supabase.table("profiles").update(
+                    {"status_message": status}
+                ).eq("id", row["id"]).execute()
             logger.info(f"NPC 상태 메시지 업데이트: {status}")
+        else:
+            logger.warning("NPC 프로필을 찾을 수 없습니다 (is_npc=True)")
     except Exception as e:
         logger.warning(f"NPC 상태 업데이트 실패: {e}")
 
