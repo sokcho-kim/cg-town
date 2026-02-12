@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { api } from '@/lib/api'
 import Link from 'next/link'
 
 interface Profile {
@@ -32,6 +33,7 @@ function DogamEditContent() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [isAdminEdit, setIsAdminEdit] = useState(false)
   const [techInput, setTechInput] = useState('')
   const [projectInput, setProjectInput] = useState('')
 
@@ -62,7 +64,7 @@ function DogamEditContent() {
 
       // 관리자가 다른 유저 편집하는 경우
       let profileId = user.id
-      if (targetId) {
+      if (targetId && targetId !== user.id) {
         const { data: me } = await supabase
           .from('profiles')
           .select('is_admin')
@@ -70,6 +72,7 @@ function DogamEditContent() {
           .single()
         if (me?.is_admin) {
           profileId = targetId
+          setIsAdminEdit(true)
         }
       }
 
@@ -124,14 +127,26 @@ function DogamEditContent() {
       return
     }
 
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', profile.id)
+    try {
+      if (isAdminEdit) {
+        // 관리자가 다른 유저 수정 → 백엔드 admin API (RLS 우회)
+        await api.put(`/api/admin/users/${profile.id}`, updates)
+      } else {
+        // 본인 수정 → Supabase 직접
+        const supabase = createClient()
+        const { error } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', profile.id)
 
-    if (error) {
-      alert('저장 실패: ' + error.message)
+        if (error) {
+          alert('저장 실패: ' + error.message)
+          setSaving(false)
+          return
+        }
+      }
+    } catch (err) {
+      alert(`저장 실패: ${err}`)
       setSaving(false)
       return
     }

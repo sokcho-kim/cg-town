@@ -50,6 +50,10 @@ class UpdateUserRequest(BaseModel):
     department: str | None = None
     position: str | None = None
     status_message: str | None = None
+    field: str | None = None
+    project: str | None = None
+    tmi: str | None = None
+    tech_stack: list[str] | None = None
 
 
 # ===== 사원 목록 =====
