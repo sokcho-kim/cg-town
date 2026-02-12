@@ -119,7 +119,7 @@ async def get_npc_list() -> dict:
 
 async def get_cafeteria_menu(day_param: str | None = None) -> dict:
     """식당 메뉴 조회 (오늘/내일/특정 요일)"""
-    from datetime import date, timedelta
+    from lib.timezone import today_kst
 
     supabase = get_supabase_client()
     DAY_MAP = {0: "월", 1: "화", 2: "수", 3: "목", 4: "금", 5: "토", 6: "일"}
@@ -142,7 +142,7 @@ async def get_cafeteria_menu(day_param: str | None = None) -> dict:
     menus = result.data[0].get("menus", {})
 
     # 요일 결정
-    today_wd = date.today().weekday()
+    today_wd = today_kst().weekday()
     if day_param:
         dp = day_param.strip()
         if dp == "내일":

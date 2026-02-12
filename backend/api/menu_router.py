@@ -1,12 +1,12 @@
 """식당 메뉴 API 엔드포인트"""
 import os
 import logging
-from datetime import date
 
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 
 from lib.supabase import get_supabase_admin
+from lib.timezone import today_kst
 from rag.vector_store import embed_and_store_document
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ async def save_weekly_menu(
         "week_title": body.week_title,
         "period": body.period,
         "menus": body.menus,
-        "scraped_at": date.today().isoformat(),
+        "scraped_at": today_kst().isoformat(),
     }
 
     if existing.data:
@@ -87,7 +87,7 @@ async def get_today_menu():
         return {"menu": None, "message": "등록된 식단 정보가 없습니다."}
 
     latest = result.data[0]
-    today_weekday = DAY_MAP.get(date.today().weekday())
+    today_weekday = DAY_MAP.get(today_kst().weekday())
     today_menu = latest.get("menus", {}).get(today_weekday)
 
     return {
@@ -121,7 +121,7 @@ async def refresh_npc_status(
     menus = result.data[0].get("menus", {})
     _update_npc_status(supabase, menus)
 
-    today_weekday = DAY_MAP.get(date.today().weekday())
+    today_weekday = DAY_MAP.get(today_kst().weekday())
     return {"message": f"NPC status refreshed for {today_weekday}요일"}
 
 
@@ -145,7 +145,7 @@ async def get_latest_weekly_menu():
 
 def _update_npc_status(supabase, menus: dict):
     """NPC 호비의 status_message를 오늘 메뉴로 업데이트"""
-    today_weekday = DAY_MAP.get(date.today().weekday())
+    today_weekday = DAY_MAP.get(today_kst().weekday())
     today_menu = menus.get(today_weekday)
 
     if not today_menu:

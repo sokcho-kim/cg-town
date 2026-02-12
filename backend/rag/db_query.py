@@ -1,7 +1,7 @@
 """범용 DB 쿼리 — 분류기가 추출한 table + filters로 자동 조회"""
 import logging
-from datetime import date
 from lib.supabase import get_supabase_client
+from lib.timezone import today_kst
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ async def _query_menu(filters: dict) -> dict:
         return {"answer": "아직 등록된 식단 정보가 없습니다."}
 
     menus = result.data[0].get("menus", {})
-    today_wd = date.today().weekday()
+    today_wd = today_kst().weekday()
     day_param = filters.get("day", "")
 
     # 요일 결정

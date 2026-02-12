@@ -13,22 +13,33 @@ from api.menu_router import router as menu_router
 from ws.endpoint import router as ws_router
 
 # 로깅 설정
-logging.basicConfig(level=logging.INFO)
+APP_ENV = os.environ.get("APP_ENV", "development")
+log_level = logging.DEBUG if APP_ENV == "development" else logging.INFO
+logging.basicConfig(level=log_level)
+logger = logging.getLogger(__name__)
+logger.info(f"Starting server in {APP_ENV} mode")
 
 app = FastAPI(
     title="CG Inside 직원 도감 API",
     description="CG Inside 사내 직원 도감 서비스 백엔드 API",
-    version="0.1.0"
+    version="0.1.0",
 )
 
-# CORS 설정 (프론트엔드 연동용)
+# CORS 설정 — 환경별 자동 분기
+_CORS_ORIGINS = {
+    "development": [
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ],
+    "production": [
+        "https://cg-town.vercel.app",
+    ],
+}
+allow_origins = _CORS_ORIGINS.get(APP_ENV, _CORS_ORIGINS["production"])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Next.js 개발 서버
-        "http://localhost:3001",  # Next.js 개발 서버 (대체 포트)
-        "https://cg-town.vercel.app",  # Vercel 프로덕션
-    ],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
